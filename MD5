@@ -1,0 +1,17 @@
+57ac81ff57514e6581be6437e183afcb *DESCRIPTION
+294588c6a2c510b437227e1f8da54ccb *NAMESPACE
+7713f90a1ce97bc0d2043876dbc8c7e0 *R/binsreg-package.R
+f520ef79d7808862ffa5b5a8497d35c1 *R/binsreg.R
+96b6fe0db55834e7ca4ec54629e3b7af *R/binsreg_functions.R
+c9886a541a85660bd285bae1d6328e76 *R/binsregselect.R
+525cd83d50dda310d263752431696056 *R/binsregtest.R
+5a2255b4431d8047427886103b6a45b3 *man/binsreg-package.Rd
+86954900c60cfd945b6e8fda4aac5d26 *man/binsreg.Rd
+a6376118e5e321e744ed24f68c5b4d2f *man/binsregselect.Rd
+b7077246d8df1b138ef78fb63895d6ff *man/binsregtest.Rd
+a629c6afd65278ef0ab2f38c4700c8a2 *man/print.CCFFbinsreg.Rd
+a95e115b2814ca6766266e13e977a81a *man/print.CCFFbinsregselect.Rd
+a6f6add65e26c58bffe093b27acb8f5c *man/print.CCFFbinsregtest.Rd
+879874fdc91c0c8446f2a90c2476428b *man/summary.CCFFbinsreg.Rd
+e197da5798738404ff212ecd3a79fbad *man/summary.CCFFbinsregselect.Rd
+cd2c1986018ae985ce1b70a24c22845a *man/summary.CCFFbinsregtest.Rd
