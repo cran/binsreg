@@ -1,4 +1,4 @@
-# 03/17/2019
+# 08/05/2021
 # binsreg package, supporting functions
 # p: degree of polynomial
 # s: number of cts (deriv) constraints
@@ -64,30 +64,52 @@ check.drop <- function(beta, k) {
 }
 
 # wrapper of vcov and vcovCL
-binsreg.vcov <- function(model, type, cluster) {
-  if (type=="const") {
-    V <- vcov(model)
+binsreg.vcov <- function(model, type, cluster, is.qreg=FALSE, ...) {
+  if (is.qreg) {
+    V <- summary.rq(model, se=type, covariance = TRUE, cluster=cluster, ...)$cov
   } else {
-    V <- vcovCL(model, type=type, cluster=cluster)
+    if (type=="const") {
+      V <- vcov(model)
+    } else {
+      V <- vcovCL(model, type=type, cluster=cluster)
+    }
   }
   return(V)
 }
 
 # internal pred function (model is long regression, NA handled inside)
-binsreg.pred <- function(X, model, type="xb", vce, cluster=NULL) {
+binsreg.pred <- function(X, model, type="xb", vce, cluster=NULL, deriv=0, wvec=NULL, is.qreg=FALSE, avar=FALSE,...) {
    k <- ncol(X)
    fit <- NA
    if (type == "xb" | type == "all") {
       coef <- model$coeff
       coef[is.na(coef)] <- 0
-      fit <- as.vector(X %*% coef[1:k])
+      if (!is.null(wvec) & deriv==0) {
+        fit <- as.vector(X %*% coef[1:k]) + sum(wvec*coef[-(1:k)])
+      } else {
+        fit <- as.vector(X %*% coef[1:k])
+      }
    }
    se <- NA
    if (type == "se" | type == "all") {
-      pos <- !is.na(model$coeff[1:k])
-      k.new <- sum(pos)
-      vcv <- binsreg.vcov(model, type=vce, cluster=cluster)[1:k.new, 1:k.new]
-      se <- sqrt(rowSums((X[, pos, drop=F] %*% vcv) * X[, pos, drop=F]))
+      if (is.qreg) {
+        vcv <- binsreg.vcov(model, type=vce, cluster=cluster, is.qreg=TRUE, ...)
+      } else {
+        vcv <- binsreg.vcov(model, type=vce, cluster=cluster)
+      }
+      if (avar) {
+        pos <- !is.na(model$coeff[1:k])
+        k.new <- sum(pos)
+        vcv <- vcv[1:k.new, 1:k.new]
+        se <- sqrt(rowSums((X[, pos, drop=F] %*% vcv) * X[, pos, drop=F]))
+      } else {
+        if (!is.null(wvec)) {
+          if (deriv==0) X <- cbind(X, outer(rep(1,nrow(X)), wvec))
+          else          X <- cbind(X, outer(rep(1,nrow(X)), rep(0,length(wvec))))
+        }
+        pos <- !is.na(model$coeff)
+        se <- sqrt(rowSums((X[, pos, drop=F] %*% vcv) * X[, pos, drop=F]))
+      }
    }
    return(list(fit=fit, se=se))
 }
@@ -101,7 +123,7 @@ lssqrtm <- function(A) {
 }
 
 # pval, cval simulation (tstat should be 2-col matrix)
-binsreg.pval <- function(num, denom, rep, tstat=NULL, side=NULL, alpha) {
+binsreg.pval <- function(num, denom, rep, tstat=NULL, side=NULL, alpha, lp=Inf) {
   tvec <- c()
   pval <- NA
   if (!is.null(tstat)) pval <- rep(0, nrow(tstat))
@@ -115,7 +137,8 @@ binsreg.pval <- function(num, denom, rep, tstat=NULL, side=NULL, alpha) {
     # for critical value
     if (!is.null(side)) {
        if (side == "two") {
-          tvec[i] <- max(abs(tx))
+          if (is.infinite(lp)) tvec[i] <- max(abs(tx))
+          else                 tvec[i] <- mean(abs(tx)^lp)^(1/lp)
        } else if (side == "left") {
           tvec[i] <- max(tx)
        } else if (side == "right") {
@@ -132,7 +155,8 @@ binsreg.pval <- function(num, denom, rep, tstat=NULL, side=NULL, alpha) {
          } else if (tstat[j,2] == 2) {
            pval[j] <- pval[j] + (min(tx) <= tstat[j,1])
          } else if (tstat[j,2] == 3) {
-           pval[j] <- pval[j] + (max(abs(tx)) >= tstat[j,1])
+           if (is.infinite(lp)) pval[j] <- pval[j] + (max(abs(tx)) >= tstat[j,1])
+           else                 pval[j] <- pval[j] + (mean(abs(tx)^lp)^(1/lp) >= tstat[j,1])
          }
        }
     }
@@ -147,6 +171,30 @@ binsreg.pval <- function(num, denom, rep, tstat=NULL, side=NULL, alpha) {
   }
 
   return(list(pval=pval, cval=cval))
+}
+
+# pval used only by binspwc
+binspwc.pval <- function(nummat1, nummat2, denom1, denom2, rep, tstat=NULL, testtype=NULL, lp=Inf) {
+  pval <- 0
+  k1 <- ncol(nummat1); k2 <- ncol(nummat2)
+
+  for (i in 1:rep) {
+    eps1 <- matrix(rnorm(k1, 0, 1), ncol = 1)
+    eps2 <- matrix(rnorm(k2, 0, 1), ncol = 1)
+    tx  <- (nummat1 %*% eps1 - nummat2 %*% eps2) / sqrt(denom1^2+denom2^2)
+
+    # for p value
+    if (testtype == "left") {
+      pval <- pval + (max(tx) >= tstat)
+    } else if (testtype == "right") {
+      pval <- pval + (min(tx) <= tstat)
+    } else {
+      if (is.infinite(lp)) pval <- pval + (max(abs(tx)) >= tstat)
+      else                 pval <- pval + (mean(abs(tx)^lp)^(1/lp) >= tstat)
+    }
+  }
+  pval <- pval / rep
+  return(pval)
 }
 
 # IMSE V constant
@@ -264,7 +312,7 @@ binsregselect.rot <- function(y, x, w, p, s, deriv, es=F, eN, norotnorm=F, qrot=
   imse.b <- bcons * binsreg.summ(mu.m.hat, w=weights, std=F)$mu
 
   J.rot <- ceiling((imse.b*2*(ord-deriv)/(imse.v*(1+2*deriv)))^(1/(2*ord+1)) * eN^(1/(2*ord+1)))
-  return(J.rot)
+  return(list(J.rot=J.rot, imse.b=imse.b, imse.v=imse.v))
 }
 
 # locate h
@@ -355,7 +403,7 @@ binsregselect.dpi <- function(y, x, w, p, s, deriv, es=F, vce, cluster=NULL, nbi
 
   J.dpi <- ceiling((imse.b*2*(ord-deriv)/((1+2*deriv)*imse.v))^(1/(2*ord+1)))
 
-  return(J.dpi)
+  return(list(J.dpi=J.dpi, imse.v=imse.v, imse.b=imse.b))
 }
 
 # Check local mass points
@@ -372,7 +420,7 @@ binsreg.checklocalmass <- function(x, J, es, knot=NULL) {
   return(min(uniqnum))
 }
 
-# slightly modeified mean fun
+# slightly modified mean fun
 binsreg.summ <- function(x, w=NULL, std=F) {
   mu <- sig <- NA
   if (is.null(w)) {
@@ -384,3 +432,28 @@ binsreg.summ <- function(x, w=NULL, std=F) {
   }
   return(list(mu=mu, sig=sig))
 }
+
+# extract formula information
+binsreg.model.mat <- function(formula=NULL, data=NULL) {
+  des <- model.matrix(formula, data=data)
+  col.term <- attr(des, "assign")                    # each column comes from which var
+  factor.strlist <- names(attr(des, "contrasts"))    # names of factor vars.
+
+  formula.info <- terms.formula(formula)
+  term.mat <- attr(formula.info, "factors")          # which term uses which var.
+  row.name <- rownames(term.mat)
+  factor.index <- row.name %in% factor.strlist       # pos of factor vars in the string list
+  usefactor.pos <- which(colSums(term.mat[factor.index,,drop=F])>0)   # index for terms that use factor vars
+
+  factor.colnum <- col.term %in% usefactor.pos      # pos of columns in the design that use factor vars
+
+  if (attr(formula.info, "intercept")==1) {
+    des <- des[,-1,drop=F]
+    factor.colnum <- factor.colnum[-1]
+  }
+  return(list(design=des, factor.colnum=factor.colnum))
+}
+
+# check if an object is a formula
+is.formula <- function(x) is.call(x) && x[[1]] == quote(`~`)
+

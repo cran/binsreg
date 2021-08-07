@@ -6,36 +6,41 @@
 \alias{_PACKAGE}
 \title{Binsreg Package Document}
 \description{
-Binscatter provides a flexible, yet parsimonious way of visualizing and summarizing large data sets in regression
-             settings, and has been a popular methodology in applied microeconomics and other social sciences. The binsreg package provides tools for
+Binscatter provides a flexible, yet parsimonious way of visualizing and summarizing large data sets
+             and has been a popular methodology in applied microeconomics and other social sciences. The binsreg package provides tools for
              statistical analysis using the binscatter methods developed in
-             \href{https://arxiv.org/abs/1902.09608}{Cattaneo, Crump, Farrell and Feng (2019a)}.
-             \code{\link{binsreg}} implements binscatter estimation with robust inference and plots, including
+             \href{https://arxiv.org/abs/1902.09608}{Cattaneo, Crump, Farrell and Feng (2021a)}.
+             \code{\link{binsreg}} implements binscatter least squares regression with robust inference and plots, including
              curve estimation, pointwise confidence intervals and uniform confidence band.
-             \code{\link{binsregtest}} implements hypothesis testing procedures for parametric specification
-             of and nonparametric shape restrictions on the unknown regression function.
+             \code{\link{binsqreg}} implements binscatter quantile regression with robust inference and plots, including
+             curve estimation, pointwise confidence intervals and uniform confidence band.
+             \code{\link{binsglm}} implements binscatter generalized linear regression with robust inference and plots, including
+             curve estimation, pointwise confidence intervals and uniform confidence band.
+             \code{\link{binstest}} implements binscatter-based hypothesis testing procedures for parametric specifications
+             of and shape restrictions on the unknown function of interest.
+             \code{\link{binspwc}} implements hypothesis testing procedures for pairwise group comparison of binscatter estimators.
              \code{\link{binsregselect}} implements data-driven number of bins selectors for binscatter
              implementation using either quantile-spaced or evenly-spaced binning/partitioning.
              All the commands allow for covariate adjustment, smoothness restrictions, and clustering,
              among other features.
 
              The companion software article,
-             \href{https://arxiv.org/abs/1902.09615}{Cattaneo, Crump, Farrell and Feng (2019b)},
-             provides further implementation details and empirical illustration. For related Stata and R packages
+             \href{https://arxiv.org/abs/1902.09615}{Cattaneo, Crump, Farrell and Feng (2021b)},
+             provides further implementation details and empirical illustration. For related Stata, R and Python packages
              useful for nonparametric data analysis and statistical inference, visit
-             \href{https://sites.google.com/site/nppackages}{https://sites.google.com/site/nppackages}.
+             \href{https://nppackages.github.io/}{https://nppackages.github.io/}.
 }
 \references{
-Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2019a: \href{https://arxiv.org/abs/1902.09608}{On Binscatter}. Working Paper.
+Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2021a: \href{https://arxiv.org/abs/1902.09608}{On Binscatter}. Working Paper.
 
-Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2019b: \href{https://arxiv.org/abs/1902.09615}{Binscatter Regressions}. Working Paper.
+Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2021b: \href{https://arxiv.org/abs/1902.09615}{Binscatter Regressions}. Working Paper.
 }
 \author{
-Matias D. Cattaneo, University of Michigan, Ann Arbor, MI. \email{cattaneo@umich.edu}.
+Matias D. Cattaneo, Princeton University, Princeton, NJ. \email{cattaneo@princeton.edu}.
 
 Richard K. Crump, Federal Reserve Bank of New York, New York, NY. \email{richard.crump@ny.frb.org}.
 
 Max H. Farrell, University of Chicago, Chicago, IL. \email{max.farrell@chicagobooth.edu}.
 
-Yingjie Feng (maintainer), University of Michigan, Ann Arbor, MI. \email{yjfeng@umich.edu}.
+Yingjie Feng (maintainer), Tsinghua University, Beijing, China. \email{fengyingjiepku@gmail.com}.
 }

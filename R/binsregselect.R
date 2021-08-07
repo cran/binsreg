@@ -1,10 +1,11 @@
 ######################################################################################
-#'@title Data-driven IMSE-Optimal Partitioning/Binning Selection for Binscatter
+#'@title Data-Driven IMSE-Optimal Partitioning/Binning Selection for Binscatter
 #'@description \code{binsregselect} implements data-driven procedures for selecting the number of bins for binscatter
 #'             estimation. The selected number is optimal in minimizing integrated mean squared error (IMSE).
 #'@param  y outcome variable. A vector.
 #'@param  x independent variable of interest. A vector.
-#'@param  w control variables. A matrix or a vector.
+#'@param  w control variables. A matrix, a vector or a \code{\link{formula}}.
+#'@param  data an optional data frame containing variables used in the model.
 #'@param  deriv  derivative order of the regression function for estimation, testing and plotting.
 #'               The default is \code{deriv=0}, which corresponds to the function itself.
 #'@param  bins a vector. \code{bins=c(p,s)} set a piecewise polynomial of degree \code{p} with \code{s} smoothness constraints
@@ -18,9 +19,9 @@
 #'@param  nbinsrot initial number of bins value used to construct the DPI number of bins selector.
 #'                 If not specified, the data-driven ROT selector is used instead.
 #'@param  simsgrid number of evaluation points of an evenly-spaced grid within each bin used for evaluation of
-#'                 the supremum (or infimum) operation needed to construct confidence bands and hypothesis testing
+#'                 the supremum (infimum or Lp metric) operation needed to construct confidence bands and hypothesis testing
 #'                 procedures. The default is \code{simsgrid=20}, which corresponds to 20 evenly-spaced
-#'                 evaluation points within each bin for approximating the supremum (or infimum) operator.
+#'                 evaluation points within each bin for approximating the supremum (infimum or Lp metric) operator.
 #'@param  savegrid If true, a data frame produced containing grid.
 #'@param  vce procedure to compute the variance-covariance matrix estimator. Options are
 #'           \itemize{
@@ -37,11 +38,13 @@
 #'@param  useeffn effective sample size to be used when computing the (IMSE-optimal) number of bins. This option
 #'                is useful for extrapolating the optimal number of bins to larger (or smaller) datasets than
 #'                the one used to compute it.
+#'@param  randcut upper bound on a uniformly distributed variable used to draw a subsample for bins selection.
+#'                Observations for which \code{runif()<=#} are used. # must be between 0 and 1.
 #'@param  cluster cluster ID. Used for compute cluster-robust standard errors.
 #'@param  dfcheck adjustments for minimum effective sample size checks, which take into account number of unique
 #'                values of \code{x} (i.e., number of mass points), number of clusters, and degrees of freedom of
-#'                the different stat models considered. The default is \code{dfcheck=c(20, 30)}.
-#'                See \href{https://arxiv.org/abs/1902.09615}{Cattaneo, Crump, Farrell and Feng (2019b)} for more details.
+#'                the different statistical models considered. The default is \code{dfcheck=c(20, 30)}.
+#'                See \href{https://arxiv.org/abs/1902.09615}{Cattaneo, Crump, Farrell and Feng (2021b)} for more details.
 #'@param  masspoints how mass points in \code{x} are handled. Available options:
 #'                   \itemize{
 #'                   \item \code{"on"} all mass point and degrees of freedom checks are implemented. Default.
@@ -62,24 +65,28 @@
 #'        \item{\code{nbinsrot.uknot}}{ROT number of bins, unique knots.}
 #'        \item{\code{nbinsdpi}}{DPI number of bins.}
 #'        \item{\code{nbinsdpi.uknot}}{DPI number of bins, unique knots.}
+#'        \item{\code{imse.v.rot}}{variance constant in IMSE expansion, ROT selection.}
+#'        \item{\code{imse.b.rot}}{bias constant in IMSE expansion, ROT selection.}
+#'        \item{\code{imse.v.dpi}}{variance constant in IMSE expansion, DPI selection.}
+#'        \item{\code{imse.b.dpi}}{bias constant in IMSE expansion, DPI selection.}
 #'        \item{\code{opt}}{ A list containing options passed to the function, as well as total sample size \code{n},
 #'                           number of distinct values \code{Ndist} in \code{x}, and number of clusters \code{Nclust}.}
 #'        \item{\code{data.grid}}{A data frame containing grid.}
 #'@author
-#' Matias D. Cattaneo, University of Michigan, Ann Arbor, MI. \email{cattaneo@umich.edu}.
+#' Matias D. Cattaneo, Princeton University, Princeton, NJ. \email{cattaneo@princeton.edu}.
 #'
 #' Richard K. Crump, Federal Reserve Bank of New York, New York, NY. \email{richard.crump@ny.frb.org}.
 #'
 #' Max H. Farrell, University of Chicago, Chicago, IL. \email{max.farrell@chicagobooth.edu}.
 #'
-#' Yingjie Feng (maintainer), University of Michigan, Ann Arbor, MI. \email{yjfeng@umich.edu}.
+#' Yingjie Feng (maintainer), Tsinghua University, Beijing, China. \email{fengyingjiepku@gmail.com}.
 #'
 #'@references
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2019a: \href{https://arxiv.org/abs/1902.09608}{On Binscatter}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2021a: \href{https://arxiv.org/abs/1902.09608}{On Binscatter}. Working Paper.
 #'
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2019b: \href{https://arxiv.org/abs/1902.09615}{Binscatter Regressions}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2021b: \href{https://arxiv.org/abs/1902.09615}{Binscatter Regressions}. Working Paper.
 #'
-#'@seealso \code{\link{binsreg}}, \code{\link{binsregtest}}.
+#'@seealso \code{\link{binsreg}}, \code{\link{binstest}}.
 #'
 #'@examples
 #'  x <- runif(500); y <- sin(x)+rnorm(500)
@@ -87,10 +94,10 @@
 #'  summary(est)
 #'@export
 
-binsregselect <- function(y, x, w=NULL, deriv=0,
+binsregselect <- function(y, x, w=NULL, data=NULL, deriv=0,
                           bins=c(0,0), binspos="qs", binsmethod="dpi", nbinsrot=NULL,
                           simsgrid=20, savegrid=F,
-                          vce="HC1", useeffn=NULL, cluster=NULL,
+                          vce="HC1", useeffn=NULL, randcut=NULL, cluster=NULL,
                           dfcheck=c(20,30), masspoints="on", weights=NULL, subset=NULL,
                           norotnorm=F, numdist=NULL, numclust=NULL) {
 
@@ -101,27 +108,82 @@ binsregselect <- function(y, x, w=NULL, deriv=0,
   ####################
   ### prepare data ###
   ####################
-  if (is.data.frame(y)) y <- y[,1]
-  xname <- NULL
-  if (is.data.frame(x)) {
-    xname <- colnames(x)[1]; x <- x[,1]
-  }
-  if (!is.null(w))      w <- as.matrix(w)
+  xname <- deparse(substitute(x))
+  yname <- deparse(substitute(y))
+  weightsname <- deparse(substitute(weights))
+  subsetname  <- deparse(substitute(subset))
+  clustername <- deparse(substitute(cluster))
 
-  # substract subset
+  # capture w names for grid file
+  wname <- NULL
+
+  # extract y, x, w, weights, subset, if needed (w as a matrix, others as vectors)
+  # generate design matrix for covariates W
+  if (is.null(data)) {
+    if (is.data.frame(y)) y <- y[,1]
+    if (is.data.frame(x)) x <- x[,1]
+    if (!is.null(w)) {
+      if (is.matrix(w)) wname <- colnames(w)
+      if (is.vector(w)) {
+        wname <- deparse(substitute(w))
+        w <- as.matrix(w)
+        if (is.character(w)) {
+          w <- model.matrix(~w)[,-1,drop=F]
+        }
+      } else if (is.formula(w)) {
+        wname <- all.vars(w)
+        w.model <- binsreg.model.mat(w)
+        w <- w.model$design
+      }
+    }
+  } else {
+    if (xname %in% names(data)) x <- data[,xname]
+    if (yname %in% names(data)) y <- data[,yname]
+    if (weightsname != "NULL") if (weightsname %in% names(data)) {
+      weights <- data[,weightsname]
+    }
+    if (subsetname != "NULL") if (subsetname %in% names(data))  {
+      subset  <- data[,subsetname]
+    }
+    if (clustername != "NULL") if (clustername %in% names(data)) {
+      cluster <- data[,clustername]
+    }
+    if (deparse(substitute(w))!="NULL") {
+      if (is.formula(w)) {
+        wname <- all.vars(w)
+        w.model <- binsreg.model.mat(w, data=data)
+        w <- w.model$design
+      } else {
+        wname <- deparse(substitute(w))
+        if (wname %in% names(data)) w <- data[,wname]
+        w <- as.matrix(w)
+        if (is.character(w)) w <- model.matrix(~w)[,-1,drop=F]
+      }
+    }
+  }
+
+  if (!is.null(w)) nwvar <- ncol(w)
+  else             nwvar <- 0
+
+  # extract subset
   if (!is.null(subset)) {
     y <- y[subset]
     x <- x[subset]
-    w <- w[subset, , drop = F]
+    if (!is.null(w)) w <- w[subset, , drop = F]
+    if (!is.null(cluster)) cluster <- cluster[subset]
+    if (!is.null(weights)) weights <- weights[subset]
   }
 
   na.ok <- complete.cases(x) & complete.cases(y)
   if (!is.null(w)) na.ok <- na.ok & complete.cases(w)
+  if (!is.null(weights)) na.ok <- na.ok & complete.cases(weights)
+  if (!is.null(cluster)) na.ok <- na.ok & complete.cases(cluster)
 
   y <- y[na.ok]
   x <- x[na.ok]
   w <- w[na.ok, , drop = F]
-  xmin <- min(x); xmax <- max(x)
+  weights <- weights[na.ok]
+  cluster <- cluster[na.ok]
 
   #############################error checking
   exit <- 0
@@ -175,6 +237,28 @@ binsregselect <- function(y, x, w=NULL, deriv=0,
     eN <- min(eN, Nclust)
   }
 
+  # take a subsample?
+  x.full <- x
+  eN.sub <- eN; Ndist.sub <- Ndist; Nclust.sub <- Nclust
+  if (!is.null(randcut)) {
+    subsample <- (runif(N)<=randcut)
+    x <- x[subsample]
+    y <- y[subsample]
+    w <- w[subsample,, drop=F]
+    weights <- weights[subsample]
+    cluster <- cluster[subsample]
+
+    eN.sub <- length(x)
+    if (massadj) {
+      Ndist.sub <- length(unique(x))
+      eN.sub    <- min(eN.sub, Ndist.sub)
+    }
+    if (!is.null(cluster)) {
+      Nclust.sub <- length(unique(cluster))
+      eN.sub     <- min(eN.sub, Nclust.sub)
+    }
+  }
+
   # Prepare params
   p <- bins[1]; s <- bins[2]
 
@@ -198,19 +282,22 @@ binsregselect <- function(y, x, w=NULL, deriv=0,
   }
 
   # Run rot selection
-  J.rot.regul <- J.rot.poly <- NA
+  J.rot.regul <- J.rot.poly <- NA; imse.v.rot <- imse.b.rot <- NA
   if (!is.null(nbinsrot)) J.rot.regul <- nbinsrot
   if (is.na(J.rot.regul) & !rot.fewobs) {
     # checking
-    if (eN <= dfcheck[1]+p+1+qrot) {
+    if (eN.sub <= dfcheck[1]+p+1+qrot) {
       rot.fewobs <- T
       warning("too small effective sample size for bin selection.")
     }
 
     if (!rot.fewobs) {
-      J.rot.poly <- binsregselect.rot(y, x, w, p, s, deriv, es=es, eN=eN, qrot=qrot, norotnorm=norotnorm, weights=weights)
+      J.rot.poly <- binsregselect.rot(y, x, w, p, s, deriv, es=es, eN=eN.sub, qrot=qrot, norotnorm=norotnorm, weights=weights)
+      imse.v.rot <- J.rot.poly$imse.v
+      imse.b.rot <- J.rot.poly$imse.b
+      J.rot.poly <- J.rot.poly$J.rot
     }
-    J.rot.regul <- max(J.rot.poly, ceiling((2*(p+1-deriv)/(1+2*deriv)*rot.lb*eN)^(1/(2*p+3))))
+    J.rot.regul <- max(J.rot.poly, ceiling((2*(p+1-deriv)/(1+2*deriv)*rot.lb*eN.sub)^(1/(2*p+3))))
   }
   # repeated knots?
   J.rot.uniq <- J.rot.regul
@@ -219,11 +306,11 @@ binsregselect <- function(y, x, w=NULL, deriv=0,
   }
 
   # Run dpi selection
-  J.dpi <- NA
+  J.dpi <- NA; imse.v.dpi <- imse.b.dpi <- NA
   if (binsmethod == "dpi" & !dpi.fewobs) {
     # check if dpi can be implemented
     if (!is.na(J.rot.uniq)) {
-      if ((p-s+1)*(J.rot.uniq-1)+p+2+dfcheck[2]>=eN) {
+      if ((p-s+1)*(J.rot.uniq-1)+p+2+dfcheck[2]>=eN.sub) {
          dpi.fewobs <- T
          warning("too small effective sample size for DPI selection.")
       }
@@ -246,24 +333,29 @@ binsregselect <- function(y, x, w=NULL, deriv=0,
           cluster <- x
           # note: clustered at mass point level
         } else {
-          if (Nclust > Ndist) {
+          if (Nclust.sub > Ndist.sub) {
             cluster <- x
             warning("# mass points < # clusters. Clustered at mass point level.")
           }
         }
       }
       J.dpi <- binsregselect.dpi(y, x, w, p, s, deriv, es=es, vce=vce, cluster=cluster, nbinsrot=J.rot.uniq, weights=weights)
+      imse.b.dpi <- J.dpi$imse.b
+      imse.v.dpi <- J.dpi$imse.v * eN.sub
+      J.dpi      <- J.dpi$J.dpi
     }
   }
   J.dpi.uniq <- J.dpi
 
-  if (!is.null(useeffn)) {
-    scaling <- (useeffn/eN)^(1/(2*p+2+1))
-    if (!is.na(J.rot.poly))  J.rot.poly  <- J.rot.poly * scaling
-    if (!is.na(J.rot.regul)) J.rot.regul <- J.rot.regul * scaling
-    if (!is.na(J.rot.uniq))  J.rot.uniq  <- J.rot.uniq * scaling
-    if (!is.na(J.dpi))       J.dpi       <- J.dpi * scaling
-    if (!is.na(J.dpi.uniq))  J.dpi.uniq  <- J.dpi.uniq * scaling
+  if (!is.null(useeffn)|!is.null(randcut)) {
+    if (!is.null(useeffn)) scaling <- (useeffn/eN)^(1/(2*p+2+1))
+    if (!is.null(randcut)) scaling <- (eN/eN.sub)^(1/(2*p+2+1))
+
+    if (!is.na(J.rot.poly))  J.rot.poly  <- ceiling(J.rot.poly * scaling)
+    if (!is.na(J.rot.regul)) J.rot.regul <- ceiling(J.rot.regul * scaling)
+    if (!is.na(J.rot.uniq))  J.rot.uniq  <- ceiling(J.rot.uniq * scaling)
+    if (!is.na(J.dpi))       J.dpi       <- ceiling(J.dpi * scaling)
+    if (!is.na(J.dpi.uniq))  J.dpi.uniq  <- ceiling(J.dpi.uniq * scaling)
   }
 
   # Generate a knot vector
@@ -275,9 +367,9 @@ binsregselect <- function(y, x, w=NULL, deriv=0,
   knot <- NA; data.grid <- NA
   if (!is.na(Jselect) & is.null(useeffn)) {
     if (es) {
-      knot <- genKnot.es(xmin, xmax, Jselect)
+      knot <- genKnot.es(min(x.full), max(x.full), Jselect)
     } else {
-      knot <- genKnot.qs(x, Jselect)
+      knot <- genKnot.qs(x.full, Jselect)
     }
     knot <- c(knot[1], unique(knot[-1]))
     Jselect <- length(knot)-1
@@ -289,15 +381,9 @@ binsregselect <- function(y, x, w=NULL, deriv=0,
     if (savegrid) {
       grid <- binsreg.grid(knot=knot, ngrid=simsgrid, addmore=T)
       data.grid <- cbind(grid$eval, grid$bin, grid$isknot)
-      if (!is.null(w)) {
-         data.grid <- cbind(data.grid, matrix(0, nrow(data.grid), ncol(w)))
-      }
+      data.grid <- cbind(data.grid, matrix(0, nrow(data.grid), length(wname)))
       data.grid <- data.frame(data.grid)
-      if (is.null(xname)) {
-         colnames(data.grid) <- c("x", "binreg_bin", "binsreg_isknot", colnames(w))
-      } else {
-         colnames(data.grid) <- c(xname, "binreg_bin", "binsreg_isknot", colnames(w))
-      }
+      colnames(data.grid) <- c(xname, "binreg_bin", "binsreg_isknot", wname)
     }
   }
 
@@ -305,7 +391,8 @@ binsregselect <- function(y, x, w=NULL, deriv=0,
   #######output#########
   ######################
   out <- list(nbinsrot.poly=J.rot.poly, nbinsrot.regul=J.rot.regul, nbinsrot.uknot=J.rot.uniq,
-              nbinsdpi=J.dpi, nbinsdpi.uknot=J.dpi.uniq,
+              nbinsdpi=J.dpi, nbinsdpi.uknot=J.dpi.uniq, imse.b.rot=imse.b.rot, imse.v.rot=imse.v.rot,
+              imse.b.dpi=imse.b.dpi, imse.v.dpi=imse.v.dpi,
               opt = list(bins.p=p, bins.s=s, deriv=deriv,
                          binspos=position, binsmethod=selectmethod,
                          n=N, Ndist=Ndist, Nclust=Nclust),
@@ -376,49 +463,61 @@ summary.CCFFbinsregselect <- function(object, ...) {
   }
   cat("\n")
 
-  cat(paste(rep("=", 15 + 15 + 15), collapse="")); cat("\n")
-  cat(format("method",     width=15, justify="right"))
-  cat(format("# of bins",  width=15, justify="right"))
-  cat(format("df",         width=15, justify="right"))
+  cat(paste(rep("=", 13 + 13 + 13 + 15 + 15), collapse="")); cat("\n")
+  cat(format("method",     width=13, justify="right"))
+  cat(format("# of bins",  width=13, justify="right"))
+  cat(format("df",         width=13, justify="right"))
+  cat(format("imse, bias^2",  width=15, justify="right"))
+  cat(format("imse, var.",  width=15, justify="right"))
   cat("\n")
 
-  cat(paste(rep("-", 15 + 15 + 15), collapse="")); cat("\n")
-  cat(format("ROT-POLY",  width= 15, justify="right"))
-  cat(format(sprintf("%3.0f", x$nbinsrot.poly), width=15 , justify="right"))
+  cat(paste(rep("-", 13 + 13 + 13 + 15 + 15), collapse="")); cat("\n")
+  cat(format("ROT-POLY",  width= 13, justify="right"))
+  cat(format(sprintf("%3.0f", x$nbinsrot.poly), width=13 , justify="right"))
   ROT.poly.df <- NA
   if (!is.na(x$nbinsrot.poly)) ROT.poly.df <- x$opt$bins.p+1+(x$nbinsrot.poly-1)*(x$opt$bins.p-x$opt$bins.s+1)
-  cat(format(sprintf("%3.0f", ROT.poly.df), width=15, justify="right"))
+  cat(format(sprintf("%3.0f", ROT.poly.df), width=13, justify="right"))
+  cat(format(sprintf("%3.3f", x$imse.b.rot), width=15 , justify="right"))
+  cat(format(sprintf("%3.3f", x$imse.v.rot), width=15 , justify="right"))
   cat("\n")
 
-  cat(format("ROT-REGUL",  width= 15, justify="right"))
-  cat(format(sprintf("%3.0f", x$nbinsrot.regul), width=15 , justify="right"))
+  cat(format("ROT-REGUL",  width= 13, justify="right"))
+  cat(format(sprintf("%3.0f", x$nbinsrot.regul), width=13 , justify="right"))
   ROT.regul.df <- NA
   if (!is.na(x$nbinsrot.regul)) ROT.regul.df <- x$opt$bins.p+1+(x$nbinsrot.regul-1)*(x$opt$bins.p-x$opt$bins.s+1)
-  cat(format(sprintf("%3.0f", ROT.regul.df), width=15, justify="right"))
+  cat(format(sprintf("%3.0f", ROT.regul.df), width=13, justify="right"))
+  cat(format(sprintf("%3.0f", NA), width=15 , justify="right"))
+  cat(format(sprintf("%3.0f", NA), width=15 , justify="right"))
   cat("\n")
 
-  cat(format("ROT-UKNOT",  width= 15, justify="right"))
-  cat(format(sprintf("%3.0f", x$nbinsrot.uknot), width=15 , justify="right"))
+  cat(format("ROT-UKNOT",  width= 13, justify="right"))
+  cat(format(sprintf("%3.0f", x$nbinsrot.uknot), width=13 , justify="right"))
   ROT.uknot.df <- NA
   if (!is.na(x$nbinsrot.uknot)) ROT.uknot.df <- x$opt$bins.p+1+(x$nbinsrot.uknot-1)*(x$opt$bins.p-x$opt$bins.s+1)
-  cat(format(sprintf("%3.0f", ROT.uknot.df), width=15, justify="right"))
+  cat(format(sprintf("%3.0f", ROT.uknot.df), width=13, justify="right"))
+  cat(format(sprintf("%3.0f", NA), width=15 , justify="right"))
+  cat(format(sprintf("%3.0f", NA), width=15 , justify="right"))
   cat("\n")
 
   if (x$opt$binsmethod=="IMSE direct plug-in") {
-    cat(format("DPI",  width=15, justify="right"))
-    cat(format(sprintf("%3.0f", x$nbinsdpi), width=15 , justify="right"))
+    cat(format("DPI",  width=13, justify="right"))
+    cat(format(sprintf("%3.0f", x$nbinsdpi), width=13 , justify="right"))
     DPI.df <- NA
     if (!is.na(x$nbinsdpi)) DPI.df <- x$opt$bins.p+1+(x$nbinsdpi-1)*(x$opt$bins.p-x$opt$bins.s+1)
-    cat(format(sprintf("%3.0f", DPI.df), width=15, justify="right"))
+    cat(format(sprintf("%3.0f", DPI.df), width=13, justify="right"))
+    cat(format(sprintf("%3.3f", x$imse.b.dpi), width=15 , justify="right"))
+    cat(format(sprintf("%3.3f", x$imse.v.dpi), width=15 , justify="right"))
     cat("\n")
 
-    cat(format("DPI-UKNOT",  width=15, justify="right"))
-    cat(format(sprintf("%3.0f", x$nbinsdpi.uknot), width=15 , justify="right"))
+    cat(format("DPI-UKNOT",  width=13, justify="right"))
+    cat(format(sprintf("%3.0f", x$nbinsdpi.uknot), width=13 , justify="right"))
     DPI.uknot.df <- NA
     if (!is.na(x$nbinsdpi.uknot)) DPI.uknot.df <- x$opt$bins.p+1+(x$nbinsdpi.uknot-1)*(x$opt$bins.p-x$opt$bins.s+1)
-    cat(format(sprintf("%3.0f", DPI.uknot.df), width=15, justify="right"))
+    cat(format(sprintf("%3.0f", DPI.uknot.df), width=13, justify="right"))
+    cat(format(sprintf("%3.0f", NA), width=15 , justify="right"))
+    cat(format(sprintf("%3.0f", NA), width=15 , justify="right"))
     cat("\n")
   }
-  cat(paste(rep("-", 15 + 15 + 15), collapse=""))
+  cat(paste(rep("-", 13 + 13 + 13 + 15 + 15), collapse=""))
   cat("\n")
 }

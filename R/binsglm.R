@@ -1,24 +1,25 @@
-####################################################################################################
-#'@title  Data-Driven Binscatter Least Squares Regression with Robust Inference Procedures and Plots
-#'@description \code{binsreg} implements binscatter least squares regression with robust inference procedures and plots, following the
+###########################################################################################################
+#'@title  Data-Driven Binscatter Generalized Linear Regression with Robust Inference Procedures and Plots
+#'@description \code{binsglm} implements binscatter generalized linear regression with robust inference procedures and plots, following the
 #'             results in \href{https://arxiv.org/abs/1902.09608}{Cattaneo, Crump, Farrell and Feng (2021a)}.
-#'             Binscatter provides a flexible way to describe the mean relationship between two variables, after
+#'             Binscatter provides a flexible way to describe the relationship between two variables, after
 #'             possibly adjusting for other covariates, based on partitioning/binning of the independent variable of interest.
 #'             The main purpose of this function is to generate binned scatter plots with curve estimation with robust pointwise confidence intervals and
-#'             uniform confidence band.  If the binning scheme is not set by the user, the companion function
-#'             \code{\link{binsregselect}} is used to implement binscatter in a data-driven (optimal)
-#'             way. Hypothesis testing about the regression function can be conducted via the companion
+#'             uniform confidence band. If the binning scheme is not set by the user, the companion function
+#'             \code{\link{binsregselect}} is used to implement binscatter in a data-driven way. Hypothesis testing about the function of interest can be conducted via the companion
 #'             function \code{\link{binstest}}.
 #'@param  y outcome variable. A vector.
 #'@param  x independent variable of interest. A vector.
 #'@param  w control variables. A matrix, a vector or a \code{\link{formula}}.
-#'@param  data an optional data frame containing variables used in the model.
+#'@param  data an optional data frame containing variables in the model.
 #'@param  at value of \code{w} at which the estimated function is evaluated.  The default is \code{at="mean"}, which corresponds to
 #'           the mean of \code{w}. Other options are: \code{at="median"} for the median of \code{w}, \code{at="zero"} for a vector of zeros.
 #'           \code{at} can also be a vector of the same length as the number of columns of \code{w} (if \code{w} is a matrix) or a data frame containing the same variables as specified in \code{w} (when
 #'           \code{data} is specified). Note that when \code{at="mean"} or \code{at="median"}, all factor variables (if specified) are excluded from the evaluation (set as zero).
+#'@param  family a description of the error distribution and link function to be used in the generalized linear model. (See \code{\link{family}} for details of family functions.)
 #'@param  deriv  derivative order of the regression function for estimation, testing and plotting.
-#'               The default is \code{deriv=0}, which corresponds to the function itself.
+#'               The default is \code{deriv=0}, which corresponds to the function itself. If \code{nolink=TRUE}, \code{deriv} cannot be greater than 1.
+#'@param  nolink if true, the function within the inverse link function is reported instead of the conditional mean function for the outcome.
 #'@param  dots a vector. \code{dots=c(p,s)} sets a piecewise polynomial of degree \code{p} with \code{s} smoothness constraints for
 #'             point estimation and plotting as "dots". The default is \code{dots=c(0,0)}, which corresponds to
 #'             piecewise constant (canonical binscatter)
@@ -91,7 +92,8 @@
 #'              \code{nsims=500}, which corresponds to 500 draws from a standard Gaussian random vector of size
 #'              \code{[(p+1)*J - (J-1)*s]}.
 #'@param  simsgrid number of evaluation points of an evenly-spaced grid within each bin used for evaluation of
-#'                 the supremum operation needed to construct confidence bands. The default is \code{simsgrid=20}, which corresponds to 20 evenly-spaced
+#'                 the supremum operation needed to construct confidence bands.
+#'                 The default is \code{simsgrid=20}, which corresponds to 20 evenly-spaced
 #'                 evaluation points within each bin for approximating the supremum operator.
 #'@param  simsseed  seed for simulation.
 #'@param  vce Procedure to compute the variance-covariance matrix estimator. Options are
@@ -113,7 +115,7 @@
 #'@param  noplot If true, no plot produced.
 #'@param  dfcheck adjustments for minimum effective sample size checks, which take into account number of unique
 #'                values of \code{x} (i.e., number of mass points), number of clusters, and degrees of freedom of
-#'                the different statistical models considered. The default is \code{dfcheck=c(20, 30)}.
+#'                the different stat models considered. The default is \code{dfcheck=c(20, 30)}.
 #'                See \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2021_Stata.pdf}{Cattaneo, Crump, Farrell and Feng (2021b)} for more details.
 #'@param  masspoints how mass points in \code{x} are handled. Available options:
 #'                   \itemize{
@@ -127,8 +129,8 @@
 #'@param  weights an optional vector of weights to be used in the fitting process. Should be \code{NULL} or
 #'                a numeric vector. For more details, see \code{\link{lm}}.
 #'@param  subset  Optional rule specifying a subset of observations to be used.
-#'@param  plotxrange a vector. \code{plotxrange=c(min, max)} specifies a range of the x-axis for plotting. Observations outside the range are dropped in the plot.
-#'@param  plotyrange a vector. \code{plotyrange=c(min, max)} specifies a range of the y-axis for plotting. Observations outside the range are dropped in the plot.
+#'@param  plotxrange a vector. \code{plotxrange=c(min, max)} specifies a range of the x-axis for binscatter plot. Observations outside the range are dropped in the plot.
+#'@param  plotyrange a vector. \code{plotyrange=c(min, max)} specifies a range of the y-axis for binscatter plot. Observations outside the range are dropped in the plot.
 #'@return \item{\code{bins_plot}}{A \code{ggplot} object for binscatter plot.}
 #'        \item{\code{data.plot}}{A list containing data for plotting. Each item is a sublist of data frames for each group. Each sublist may contain the following data frames:
 #'        \itemize{
@@ -172,21 +174,21 @@
 #'@seealso \code{\link{binsregselect}}, \code{\link{binstest}}.
 #'
 #'@examples
-#'  x <- runif(500); y <- sin(x)+rnorm(500)
+#'  x <- runif(500); d <- 1*(runif(500)<=x)
 #'  ## Binned scatterplot
-#'  binsreg(y,x)
+#'  binsglm(d, x, family=binomial())
 #'@export
 
-binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
-                    dots=c(0,0), dotsgrid=0, dotsgridmean=T, line=NULL, linegrid=20,
-                    ci=NULL, cigrid=0, cigridmean=T, cb=NULL, cbgrid=20,
-                    polyreg=NULL, polyreggrid=20, polyregcigrid=0,
-                    by=NULL, bycolors=NULL, bysymbols=NULL, bylpatterns=NULL,
-                    legendTitle=NULL, legendoff=F,
-                    nbins=NULL, binspos="qs", binsmethod="dpi", nbinsrot=NULL, samebinsby=F, randcut=NULL,
-                    nsims=500, simsgrid=20, simsseed=NULL,
-                    vce="HC1",cluster=NULL, asyvar=F, level=95,
-                    noplot=F, dfcheck=c(20,30), masspoints="on", weights=NULL, subset=NULL, plotxrange=NULL, plotyrange=NULL) {
+binsglm  <- function(y, x, w=NULL, data=NULL, at=NULL, family=gaussian(), deriv=0, nolink=F,
+                     dots=c(0,0), dotsgrid=0, dotsgridmean=T, line=NULL, linegrid=20,
+                     ci=NULL, cigrid=0, cigridmean=T, cb=NULL, cbgrid=20,
+                     polyreg=NULL, polyreggrid=20, polyregcigrid=0,
+                     by=NULL, bycolors=NULL, bysymbols=NULL, bylpatterns=NULL,
+                     legendTitle=NULL, legendoff=F,
+                     nbins=NULL, binspos="qs", binsmethod="dpi", nbinsrot=NULL, samebinsby=F, randcut=NULL,
+                     nsims=500, simsgrid=20, simsseed=NULL,
+                     vce="HC1",cluster=NULL, asyvar=F, level=95,
+                     noplot=F, dfcheck=c(20,30), masspoints="on", weights=NULL, subset=NULL, plotxrange=NULL, plotyrange=NULL) {
 
   # param for internal use
   qrot <- 2
@@ -226,7 +228,7 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
     if (xname %in% names(data)) x <- data[,xname]
     if (yname %in% names(data)) y <- data[,yname]
     if (byname != "NULL") if (byname %in% names(data)) {
-       by <- data[,byname]
+      by <- data[,byname]
     }
     if (weightsname != "NULL") if (weightsname %in% names(data)) {
       weights <- data[,weightsname]
@@ -267,7 +269,6 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
   if (!is.null(w)) nwvar <- ncol(w)
   else             nwvar <- 0
 
-
   # extract subset
   if (!is.null(subset)) {
     y <- y[subset]
@@ -296,12 +297,40 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
   # evaluation point of w
   if (is.null(at))  at <- "mean"
 
+  # extract family obj
+  familyname <- family$family
+  linkinv    <- family$linkinv
+  linkinv.1  <- family$mu.eta           # 1st deriv of inverse link
+  # 2nd derivative
+  if (family$link=="logit") {
+    linkinv.2 <- function(z) linkinv.1(z)*(1-2*linkinv(z))
+  } else if (family$link=="probit") {
+    linkinv.2 <- function(z) (-z)*linkinv.1(z)
+  } else if (family$link=="identity") {
+    linkinv.2 <- function(z) 0
+  } else if (family$link=="log") {
+    linkinv.2 <- function(z) linkinv(z)
+  } else if (family$link=="inverse") {
+    linkinv.2 <- function(z) 2*z^(-3)
+  } else if (family$link=="1/mu^2") {
+    linkinv.2 <- function(z) 0.75*z^(-2.5)
+  } else  if (family$link=="sqrt") {
+    linkinv.2 <- function(z) 2
+  } else  {
+    print("The specified link not allowed for computing polynomial-based CIs.")
+    stop()
+  }
+
   ##################################################
   ######## Error Checking ##########################
   ##################################################
   exit <- 0
   if (deriv < 0) {
     print("derivative incorrectly specified.")
+    exit <- 1
+  }
+  if (!nolink & deriv>1) {
+    print("derivative should be no greater than 1 when the conditional mean is requrested.")
     exit <- 1
   }
   if (dotsgrid<0|linegrid<0|cigrid<0|cbgrid<0|polyreggrid<0|polyregcigrid<0) {
@@ -819,9 +848,9 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
       eval.w <- NULL
     }
 
-    ##################################
-    # Dots and CIs for Small eN case
-    ##################################
+    ####################################
+    # Dots and CI for Small eN case
+    ####################################
 
     if (dotsmean+dotsgrid!=0 & !noplot & fewobs) {
       warning("dots=c(0,0) used.")
@@ -841,26 +870,29 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
       }
 
       if (is.null(w.sub)) {
-        model <- lm(y.sub~-1+factor(xcat.few), weights=weights.sub)
+        model <- glm(y.sub~-1+factor(xcat.few), family=family, weights=weights.sub)
       } else {
-        model <- lm(y.sub~-1+factor(xcat.few)+w.sub, weights=weights.sub)
+        model <- glm(y.sub~-1+factor(xcat.few)+w.sub, family=family, weights=weights.sub)
       }
       beta  <- model$coeff[1:k]
       beta[is.na(beta)] <- 0
       vcv   <- binsreg.vcov(model, type=vce, cluster=cluster.sub)
 
-      dots.fit <- beta
+      dots.fit.0 <- dots.fit  <- beta
       if (!is.null(eval.w)) {
         coeff.w <- model$coeff[-(1:k)]
         coeff.w[is.na(coeff.w)] <- 0
         dots.fit <- dots.fit + sum(eval.w * coeff.w)
+        dots.fit.0 <- dots.fit
       }
+      if (!nolink) dots.fit <- linkinv(dots.fit)
       data.dots <- data.frame(group=paste(byvals[i]), x=dots.x, fit=dots.fit)
       data.by$data.dots <- data.dots
       if (cigrid+cimean!=0) {
         warning("ci=c(0,0) used.")
         basis.all <- cbind(diag(length(dots.x)), outer(rep(1, length(dots.x)), eval.w))
         dots.se  <- sqrt(rowSums((basis.all %*% vcv) * basis.all))
+        if (!nolink) dots.se <- linkinv.1(dots.fit.0) * dots.se
         ci.l <- dots.fit - dots.se * qnorm(alpha)
         ci.r <- dots.fit + dots.se * qnorm(alpha)
         data.ci <- data.frame(group=byvals[i], x=dots.x, ci.l=ci.l, ci.r=ci.r)
@@ -897,12 +929,22 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
       }
       B    <- binsreg.spdes(eval=x.sub, p=dots.p, s=dots.s, deriv=0, knot=knot)
       P    <- cbind(B, w.sub)         # full design matrix
-      model.dots <- lm(y.sub~-1+P, weights=weights.sub)
+      model.dots <- glm(y.sub~-1+P, family=family, weights=weights.sub)
       check.drop(model.dots$coeff, ncol(B))
 
       basis <- binsreg.spdes(eval=dots.x, p=dots.p, s=dots.s, knot=knot, deriv=deriv)
       pred.dots  <- binsreg.pred(basis, model.dots, type = "xb", vce=vce, cluster=cluster.sub, deriv=deriv, wvec=eval.w)
       dots.fit <- pred.dots$fit
+      if (!nolink) {
+        if (deriv == 0) {
+          dots.fit <- linkinv(dots.fit)
+        }
+        if (deriv == 1) {
+          basis.0     <- binsreg.spdes(eval=dots.x, p=dots.p, s=dots.s, knot=knot, deriv=0)
+          pred.dots.0 <- binsreg.pred(basis.0, model.dots, type = "xb", vce=vce, cluster=cluster.sub, deriv=0, wvec=eval.w)
+          dots.fit    <- linkinv.1(pred.dots.0$fit) * dots.fit
+        }
+      }
       dots.fit[dots.isknot==1] <- NA
       data.dots <- data.frame(group=paste(byvals[i]), x=dots.x, bin=dots.bin, isknot=dots.isknot,
                               mid=dots.mid, fit=dots.fit)
@@ -925,13 +967,24 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
       if (line.reg.ON) {
         B     <- binsreg.spdes(eval=x.sub, p=line.p, s=line.s, deriv=0, knot=knot)
         P     <- cbind(B, w.sub)         # full design matrix
-        model.line <- lm(y.sub~-1+P, weights=weights.sub)
+        model.line <- glm(y.sub~-1+P, family=family, weights=weights.sub)
         check.drop(model.line$coeff, ncol(B))
       }
 
       basis <- binsreg.spdes(eval=line.x, p=line.p, s=line.s, knot=knot, deriv=deriv)
       pred.line  <- binsreg.pred(basis, model.line, type = "xb", vce=vce, cluster=cluster.sub, deriv=deriv, wvec=eval.w)
       line.fit <- pred.line$fit
+      if (!nolink) {
+        if (deriv == 0) {
+          line.fit <- linkinv(line.fit)
+        }
+        if (deriv == 1) {
+          basis.0     <- binsreg.spdes(eval=line.x, p=line.p, s=line.s, knot=knot, deriv=0)
+          pred.line.0 <- binsreg.pred(basis.0, model.line, type = "xb", vce=vce, cluster=cluster.sub, deriv=0, wvec=eval.w)
+          line.fit    <- linkinv.1(pred.line.0$fit) * line.fit
+        }
+      }
+
       if (line.s == 0 | line.s-deriv <= 0) {
         line.fit[line.isknot==1] <- NA
       }
@@ -953,7 +1006,7 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
       x.p <- matrix(NA, N, polyreg+1)
       for (j in 1:(polyreg+1))  x.p[,j] <- x.sub^(j-1)
       P.poly <- cbind(x.p, w.sub)
-      model.poly <- lm(y.sub~-1+P.poly, weights=weights.sub)
+      model.poly <- glm(y.sub~-1+P.poly, family=family, weights=weights.sub)
       beta.poly <- model.poly$coefficients
       beta.poly[is.na(beta.poly)] <- 0
       poly.fit  <- 0
@@ -961,6 +1014,19 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
         poly.fit <- poly.fit + poly.x^(j-deriv)*beta.poly[j+1]*factorial(j)/factorial(j-deriv)
       }
       if (!is.null(eval.w) & deriv==0) poly.fit <- poly.fit + sum(beta.poly[-(1:(polyreg+1))]*eval.w)
+      if (!nolink) {
+        if (deriv == 0) {
+          poly.fit <- linkinv(poly.fit)
+        }
+        if (deriv == 1) {
+          poly.fit.0 <- 0
+          for (j in 0:polyreg) {
+            poly.fit.0 <- poly.fit.0 + poly.x^j * beta.poly[j+1]
+          }
+          if (!is.null(eval.w)) poly.fit.0 <- poly.fit.0 + sum(beta.poly[-(1:(polyreg+1))]*eval.w)
+          poly.fit <- linkinv.1(poly.fit.0) * poly.fit
+        }
+      }
 
       data.poly <- data.frame(group=byvals[i], x=poly.x, bin=poly.bin, isknot=poly.isknot,
                               mid=poly.mid, fit=poly.fit)
@@ -985,9 +1051,31 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
           if (deriv==0) basis.polyci <- cbind(basis.polyci, outer(rep(1, nrow(basis.polyci)), eval.w))
           else          basis.polyci <- cbind(basis.polyci, outer(rep(1, nrow(basis.polyci)), rep(0, nwvar)))
         }
-
         polyci.pred <- binsreg.pred(basis.polyci, model=model.poly, type="all",
                                     vce=vce, cluster=cluster.sub, avar=T)
+
+        basis.polyci.0 <- matrix(NA, npolyci.x, polyreg+1)
+        if (!nolink) {
+          for (j in 1:(polyreg+1))  {
+            basis.polyci.0[,j] <- polyci.x^(j-1)
+          }
+          if (!is.null(eval.w)) {
+            basis.polyci.0 <- cbind(basis.polyci.0, outer(rep(1, npolyci.x), eval.w))
+          }
+          polyci.fit.0   <- linkinv.1(as.vector(basis.polyci.0 %*% beta.poly))
+
+          if (deriv == 0) {
+            polyci.pred$fit <- linkinv(polyci.pred$fit)
+            polyci.pred$se  <- polyci.fit.0 * polyci.pred$se
+          }
+          if (deriv == 1) {
+            basis.all <- linkinv.2(as.vector(basis.polyci.0 %*% beta.poly))*polyci.pred$fit*basis.polyci.0 + polyci.fit.0*basis.polyci
+            polyci.pred$fit <- polyci.fit.0 * polyci.pred$fit
+            polyci.pred$se  <- binsreg.pred(basis.all, model=model.poly, type="se",
+                                            vce=vce, cluster=cluster.sub, avar=T)$se
+          }
+        }
+
         polyci.l <- polyci.pred$fit - qnorm(alpha) * polyci.pred$se
         polyci.r <- polyci.pred$fit + qnorm(alpha) * polyci.pred$se
 
@@ -1008,7 +1096,7 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
         if (!is.null(xmean)) {
           ci.x <- c(ci.x, xmean)
         } else {
-          xcat   <- findInterval(x.sub, knot, rightmost.closed = T, left.open = T)
+          xcat <- findInterval(x.sub, knot, rightmost.closed = T, left.open = T)
           ci.x <- c(ci.x, as.vector(tapply(x.sub, xcat, FUN=mean)))
         }
         ci.bin <- c(ci.bin, 1:nbins)
@@ -1031,13 +1119,35 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
       if (ci.reg.ON) {
         B    <- binsreg.spdes(eval=x.sub, p=ci.p, s=ci.s, deriv=0, knot=knot)
         P    <- cbind(B, w.sub)            # full design matrix
-        model.ci <- lm(y.sub~P-1, weights=weights.sub)
+        model.ci <- glm(y.sub~P-1, family=family, weights=weights.sub)
         check.drop(model.ci$coeff, ncol(B))
       }
 
       basis <- binsreg.spdes(eval=ci.x, p=ci.p, s=ci.s, knot=knot, deriv=deriv)
-      ci.pred <- binsreg.pred(X=basis, model=model.ci, type="all", vce=vce,
-                              cluster=cluster.sub, deriv=deriv, wvec=eval.w, avar=asyvar)
+
+      ci.pred <- binsreg.pred(X=basis, model=model.ci, type="all",
+                              vce=vce, cluster=cluster.sub, deriv=deriv, wvec=eval.w, avar=asyvar)
+      if (!nolink) {
+        basis.0     <- binsreg.spdes(eval=ci.x, p=ci.p, s=ci.s, knot=knot, deriv=0)
+        fit.0       <- binsreg.pred(basis.0, model.ci, type = "xb", vce=vce, cluster=cluster.sub, deriv=0, wvec=eval.w)$fit
+        pred.ci.0   <- linkinv.1(fit.0)
+
+        if (asyvar | deriv==0) {
+          ci.pred$se  <- pred.ci.0 * ci.pred$se
+          if (deriv == 0) ci.pred$fit <- linkinv(ci.pred$fit)
+          if (deriv == 1) ci.pred$fit <- pred.ci.0 * ci.pred$fit
+        } else {
+          if (!is.null(eval.w)) {
+            basis.ci.0 <- cbind(basis.0, outer(rep(1, nrow(basis.0)), eval.w))
+            basis.ci   <- cbind(basis, outer(rep(1, nrow(basis)), rep(0, nwvar)))
+          }
+          basis.all <- linkinv.2(fit.0)*ci.pred$fit*basis.ci.0 + pred.ci.0*basis.ci
+          ci.pred$fit <- pred.ci.0 * ci.pred$fit
+          ci.pred$se  <- binsreg.pred(basis.all, model=model.ci, type="se",
+                                      vce=vce, cluster=cluster.sub, avar=T)$se
+        }
+      }
+
       ci.l <- ci.pred$fit - qnorm(alpha)*ci.pred$se
       ci.r <- ci.pred$fit + qnorm(alpha)*ci.pred$se
       ci.l[ci.isknot==1] <- NA
@@ -1071,7 +1181,7 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
       if (cb.reg.ON) {
         B    <- binsreg.spdes(eval=x.sub, p=cb.p, s=cb.s, deriv=0, knot=knot)
         P    <- cbind(B, w.sub)            # full design matrix
-        model.cb <- lm(y.sub~P-1, weights=weights.sub)
+        model.cb <- glm(y.sub~P-1, family=family, weights=weights.sub)
         check.drop(model.cb$coeff, ncol(B))
       }
 
@@ -1081,11 +1191,31 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
       cb.pred <- binsreg.pred(X=basis, model=model.cb, type="all", vce=vce,
                               cluster=cluster.sub, deriv=deriv, wvec=eval.w, avar=asyvar)
 
+      if (!nolink) {
+        basis.0     <- binsreg.spdes(eval=cb.x, p=cb.p, s=cb.s, knot=knot, deriv=0)
+        fit.0       <- binsreg.pred(basis.0, model.cb, type = "xb", vce=vce, cluster=cluster.sub, deriv=0, wvec=eval.w)$fit
+        pred.cb.0   <- linkinv.1(fit.0)
+
+        if (asyvar | deriv==0) {
+          cb.pred$se  <- pred.cb.0 * cb.pred$se
+          if (deriv == 0) cb.pred$fit <- linkinv(cb.pred$fit)
+          if (deriv == 1) cb.pred$fit <- pred.cb.0 * cb.pred$fit
+        } else {
+          if (!is.null(eval.w)) {
+            basis.cb.0 <- cbind(basis.0, outer(rep(1, nrow(basis.0)), eval.w))
+            basis.cb   <- cbind(basis,   outer(rep(1, nrow(basis)), rep(0, nwvar)))
+          }
+          basis.all <- linkinv.2(fit.0)*cb.pred$fit*basis.cb.0 + pred.cb.0*basis.cb
+          cb.pred$fit <- pred.cb.0 * cb.pred$fit
+          cb.pred$se  <- binsreg.pred(basis.all, model=model.cb, type="se",
+                                      vce=vce, cluster=cluster.sub, avar=T)$se
+        }
+      }
+
       ### Compute cval ####
-      x.grid <- binsreg.grid(knot, simsgrid)$eval
+      x.grid    <- binsreg.grid(knot, simsgrid)$eval
       basis.sim <- binsreg.spdes(eval=x.grid, p=cb.p, s=cb.s, knot=knot, deriv=deriv)
-      sim.pred <- binsreg.pred(X=basis.sim, model=model.cb, type="all",
-                               vce=vce, cluster=cluster.sub, avar=T)
+      sim.pred  <- binsreg.pred(X=basis.sim, model=model.cb, type="all", vce=vce, cluster=cluster.sub, avar=T)
       vcv <- binsreg.vcov(model.cb, type=vce, cluster=cluster.sub)[1:k.new, 1:k.new]
       Sigma.root <- lssqrtm(vcv)
       num        <- basis.sim[,pos,drop=F] %*% Sigma.root
@@ -1110,7 +1240,7 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
   }
 
   ########################################
-  ############# Plotting ? ################
+  ############# Ploting ? ################
   binsplot <- NULL
   if (!noplot) {
     binsplot <- ggplot() + theme_bw()
@@ -1128,56 +1258,58 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
     for (i in 1:ngroup) {
       data.by <- data.plot[[i]]
       if (!is.null(data.by$data.dots)) {
-         index <- complete.cases(data.by$data.dots[c("x", "fit")]) & (data.by$data.dots["x"]>=xr.min) & (data.by$data.dots["x"]<=xr.max) &
+        index <- complete.cases(data.by$data.dots[c("x", "fit")]) & (data.by$data.dots["x"]>=xr.min) & (data.by$data.dots["x"]<=xr.max) &
                    (data.by$data.dots["fit"]>=yr.min) & (data.by$data.dots["fit"]<=yr.max)
-         if (!legendoff) {
-           binsplot <- binsplot +
-                       geom_point(data=data.by$data.dots[index,],
-                                  aes(x=x, y=fit, colour=group), shape=bysymbols[i], size=2)
-         } else {
-           binsplot <- binsplot +
-                       geom_point(data=data.by$data.dots[index,],
-                                  aes(x=x, y=fit), col=bycolors[i], shape=bysymbols[i], size=2)
-         }
+        if (!legendoff) {
+          binsplot <- binsplot +
+            geom_point(data=data.by$data.dots[index,],
+                       aes(x=x, y=fit, colour=group), shape=bysymbols[i], size=2)
+        } else {
+          binsplot <- binsplot +
+            geom_point(data=data.by$data.dots[index,],
+                       aes(x=x, y=fit), col=bycolors[i], shape=bysymbols[i], size=2)
+        }
       }
       if (!is.null(data.by$data.line)) {
-         index <- (data.by$data.line["x"]>=xr.min) & (data.by$data.line["x"]<=xr.max) &
-                  (((data.by$data.line["fit"]>=yr.min) & (data.by$data.line["fit"]<=yr.max)) | is.na(data.by$data.line["fit"]))
-         if (!legendoff) {
-           binsplot <- binsplot +
-                       geom_line(data=data.by$data.line[index,], aes(x=x, y=fit, colour=as.factor(group)), linetype=bylpatterns[i])
-         } else {
-           binsplot <- binsplot +
-                       geom_line(data=data.by$data.line[index,], aes(x=x, y=fit), col=bycolors[i], linetype=bylpatterns[i])
-         }
+        index <- (data.by$data.line["x"]>=xr.min) & (data.by$data.line["x"]<=xr.max) &
+                 (((data.by$data.line["fit"]>=yr.min) & (data.by$data.line["fit"]<=yr.max)) | is.na(data.by$data.line["fit"]))
+        if (!legendoff) {
+          binsplot <- binsplot +
+            geom_line(data=data.by$data.line[index,], aes(x=x, y=fit, colour=as.factor(group)),
+                      linetype=bylpatterns[i])
+        } else {
+          binsplot <- binsplot +
+            geom_line(data=data.by$data.line[index,], aes(x=x, y=fit),
+                      col=bycolors[i], linetype=bylpatterns[i])
+        }
       }
       if (!is.null(data.by$data.poly)) {
-         index <- (data.by$data.poly["x"]>=xr.min) & (data.by$data.poly["x"]<=xr.max) & (data.by$data.poly["fit"]>=yr.min) & (data.by$data.poly["fit"]<=yr.max)
-         binsplot <- binsplot +
-                     geom_line(data=data.by$data.poly[index,], aes(x=x, y=fit),
-                               col=bycolors[i], linetype=bylpatterns[i])
+        index <- (data.by$data.poly["x"]>=xr.min) & (data.by$data.poly["x"]<=xr.max) & (data.by$data.poly["fit"]>=yr.min) & (data.by$data.poly["fit"]<=yr.max)
+        binsplot <- binsplot +
+          geom_line(data=data.by$data.poly[index,], aes(x=x, y=fit),
+                    col=bycolors[i], linetype=bylpatterns[i])
       }
       if (!is.null(data.by$data.polyci)) {
-         index <- (data.by$data.polyci["x"]>=xr.min) & (data.by$data.polyci["x"]<=xr.max) & (data.by$data.polyci["polyci.l"]>=yr.min) & (data.by$data.polyci["polyci.r"]<=yr.max)
-         binsplot <- binsplot +
-                     geom_errorbar(data=data.by$data.polyci[index,],
-                                   aes(x=x, ymin=polyci.l, ymax=polyci.r),
-                                   alpha=1, col=bycolors[i], linetype=bylpatterns[i])
+        index <- (data.by$data.polyci["x"]>=xr.min) & (data.by$data.polyci["x"]<=xr.max) & (data.by$data.polyci["polyci.l"]>=yr.min) & (data.by$data.polyci["polyci.r"]<=yr.max)
+        binsplot <- binsplot +
+          geom_errorbar(data=data.by$data.polyci[index,],
+                        aes(x=x, ymin=polyci.l, ymax=polyci.r),
+                        alpha=1, col=bycolors[i], linetype=bylpatterns[i])
       }
       if (!is.null(data.by$data.ci)) {
-         index <- complete.cases(data.by$data.ci[c("x", "ci.l", "ci.r")]) & (data.by$data.ci["x"]>=xr.min) & (data.by$data.ci["x"]<=xr.max) &
-                   (data.by$data.ci["ci.l"]>=yr.min) & (data.by$data.ci["ci.r"]<=yr.max)
-         binsplot <- binsplot +
-                     geom_errorbar(data=data.by$data.ci[index,],
-                                   aes(x=x, ymin=ci.l, ymax=ci.r),
-                                   alpha=1, col=bycolors[i], linetype=bylpatterns[i])
+        index <- complete.cases(data.by$data.ci[c("x", "ci.l", "ci.r")]) & (data.by$data.ci["x"]>=xr.min) & (data.by$data.ci["x"]<=xr.max) &
+                  (data.by$data.ci["ci.l"]>=yr.min) & (data.by$data.ci["ci.r"]<=yr.max)
+        binsplot <- binsplot +
+          geom_errorbar(data=data.by$data.ci[index,],
+                        aes(x=x, ymin=ci.l, ymax=ci.r),
+                        alpha=1, col=bycolors[i], linetype=bylpatterns[i])
       }
       if (!is.null(data.by$data.cb)) {
-         index <- (data.by$data.cb["x"]>=xr.min) & (data.by$data.cb["x"]<=xr.max) &
-                  (((data.by$data.cb["cb.l"]>=yr.min) & (data.by$data.cb["cb.r"]<=yr.max)) | is.na(data.by$data.cb["cb.l"]))
-         binsplot <- binsplot +
-                     geom_ribbon(data=data.by$data.cb[index,], aes(x=x, ymin=cb.l, ymax=cb.r),
-                                 alpha=0.2, fill=bycolors[i])
+        index <- (data.by$data.cb["x"]>=xr.min) & (data.by$data.cb["x"]<=xr.max) &
+                 (((data.by$data.cb["cb.l"]>=yr.min) & (data.by$data.cb["cb.r"]<=yr.max)) | is.na(data.by$data.cb["cb.l"]))
+        binsplot <- binsplot +
+          geom_ribbon(data=data.by$data.cb[index,], aes(x=x, ymin=cb.l, ymax=cb.r),
+                      alpha=0.2, fill=bycolors[i])
       }
     }
 
@@ -1199,12 +1331,12 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
   ######################################
   out <- list(bins_plot=binsplot, data.plot=data.plot, cval.by=cval.by,
               opt=list(dots=dots, line=line, ci=ci, cb=cb,
-                       polyreg=polyreg, deriv=deriv,
+                       polyreg=polyreg, deriv=deriv, family=family,
                        binspos=position, binsmethod=selectmethod,
                        N.by=N.by, Ndist.by=Ndist.by, Nclust.by=Nclust.by,
                        nbins.by=nbins.by, byvals=byvals))
   out$call <- match.call()
-  class(out) <- "CCFFbinsreg"
+  class(out) <- "CCFFbinsglm"
   return(out)
 }
 
@@ -1212,14 +1344,14 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
 ##########################################################################
 #' Internal function.
 #'
-#' @param x Class \code{CCFFbinsreg} objects.
+#' @param x Class \code{CCFFbinsglm} objects.
 #'
 #' @keywords internal
 #' @export
 #'
 
-print.CCFFbinsreg <- function(x, ...) {
-  cat("Call: binsreg\n\n")
+print.CCFFbinsglm <- function(x, ...) {
+  cat("Call: binsglm\n\n")
 
   cat("Binscatter Plot\n")
   cat(paste("Bin selection method (binsmethod)  =  ", x$opt$binsmethod,   "\n", sep=""))
@@ -1241,15 +1373,15 @@ print.CCFFbinsreg <- function(x, ...) {
 ################################################################################
 #' Internal function.
 #'
-#' @param object Class \code{CCFFbinsreg} objects.
+#' @param object Class \code{CCFFbinsglm} objects.
 #'
 #' @keywords internal
 #' @export
-summary.CCFFbinsreg <- function(object, ...) {
+summary.CCFFbinsglm <- function(object, ...) {
   x <- object
   args <- list(...)
 
-  cat("Call: binsreg\n\n")
+  cat("Call: binsqreg\n\n")
 
   cat("Binscatter Plot\n")
   cat(paste("Bin selection method (binsmethod)  =  ", x$opt$binsmethod,   "\n", sep=""))

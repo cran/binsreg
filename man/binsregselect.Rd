@@ -2,11 +2,11 @@
 % Please edit documentation in R/binsregselect.R
 \name{binsregselect}
 \alias{binsregselect}
-\title{Data-driven IMSE-Optimal Partitioning/Binning Selection for Binscatter}
+\title{Data-Driven IMSE-Optimal Partitioning/Binning Selection for Binscatter}
 \usage{
-binsregselect(y, x, w = NULL, deriv = 0, bins = c(0, 0),
-  binspos = "qs", binsmethod = "dpi", nbinsrot = NULL,
-  simsgrid = 20, savegrid = F, vce = "HC1", useeffn = NULL,
+binsregselect(y, x, w = NULL, data = NULL, deriv = 0, bins = c(0, 0),
+  binspos = "qs", binsmethod = "dpi", nbinsrot = NULL, simsgrid = 20,
+  savegrid = F, vce = "HC1", useeffn = NULL, randcut = NULL,
   cluster = NULL, dfcheck = c(20, 30), masspoints = "on",
   weights = NULL, subset = NULL, norotnorm = F, numdist = NULL,
   numclust = NULL)
@@ -16,7 +16,9 @@ binsregselect(y, x, w = NULL, deriv = 0, bins = c(0, 0),
 
 \item{x}{independent variable of interest. A vector.}
 
-\item{w}{control variables. A matrix or a vector.}
+\item{w}{control variables. A matrix, a vector or a \code{\link{formula}}.}
+
+\item{data}{an optional data frame containing variables used in the model.}
 
 \item{deriv}{derivative order of the regression function for estimation, testing and plotting.
 The default is \code{deriv=0}, which corresponds to the function itself.}
@@ -36,9 +38,9 @@ for rule of thumb implementation.}
 If not specified, the data-driven ROT selector is used instead.}
 
 \item{simsgrid}{number of evaluation points of an evenly-spaced grid within each bin used for evaluation of
-the supremum (or infimum) operation needed to construct confidence bands and hypothesis testing
+the supremum (infimum or Lp metric) operation needed to construct confidence bands and hypothesis testing
 procedures. The default is \code{simsgrid=20}, which corresponds to 20 evenly-spaced
-evaluation points within each bin for approximating the supremum (or infimum) operator.}
+evaluation points within each bin for approximating the supremum (infimum or Lp metric) operator.}
 
 \item{savegrid}{If true, a data frame produced containing grid.}
 
@@ -59,12 +61,15 @@ evaluation points within each bin for approximating the supremum (or infimum) op
 is useful for extrapolating the optimal number of bins to larger (or smaller) datasets than
 the one used to compute it.}
 
+\item{randcut}{upper bound on a uniformly distributed variable used to draw a subsample for bins selection.
+Observations for which \code{runif()<=#} are used. # must be between 0 and 1.}
+
 \item{cluster}{cluster ID. Used for compute cluster-robust standard errors.}
 
 \item{dfcheck}{adjustments for minimum effective sample size checks, which take into account number of unique
 values of \code{x} (i.e., number of mass points), number of clusters, and degrees of freedom of
-the different stat models considered. The default is \code{dfcheck=c(20, 30)}.
-See \href{https://arxiv.org/abs/1902.09615}{Cattaneo, Crump, Farrell and Feng (2019b)} for more details.}
+the different statistical models considered. The default is \code{dfcheck=c(20, 30)}.
+See \href{https://arxiv.org/abs/1902.09615}{Cattaneo, Crump, Farrell and Feng (2021b)} for more details.}
 
 \item{masspoints}{how mass points in \code{x} are handled. Available options:
 \itemize{
@@ -93,6 +98,10 @@ a numeric vector. For more details, see \code{\link{lm}}.}
        \item{\code{nbinsrot.uknot}}{ROT number of bins, unique knots.}
        \item{\code{nbinsdpi}}{DPI number of bins.}
        \item{\code{nbinsdpi.uknot}}{DPI number of bins, unique knots.}
+       \item{\code{imse.v.rot}}{variance constant in IMSE expansion, ROT selection.}
+       \item{\code{imse.b.rot}}{bias constant in IMSE expansion, ROT selection.}
+       \item{\code{imse.v.dpi}}{variance constant in IMSE expansion, DPI selection.}
+       \item{\code{imse.b.dpi}}{bias constant in IMSE expansion, DPI selection.}
        \item{\code{opt}}{ A list containing options passed to the function, as well as total sample size \code{n},
                           number of distinct values \code{Ndist} in \code{x}, and number of clusters \code{Nclust}.}
        \item{\code{data.grid}}{A data frame containing grid.}
@@ -107,19 +116,19 @@ a numeric vector. For more details, see \code{\link{lm}}.}
  summary(est)
 }
 \references{
-Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2019a: \href{https://arxiv.org/abs/1902.09608}{On Binscatter}. Working Paper.
+Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2021a: \href{https://arxiv.org/abs/1902.09608}{On Binscatter}. Working Paper.
 
-Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2019b: \href{https://arxiv.org/abs/1902.09615}{Binscatter Regressions}. Working Paper.
+Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2021b: \href{https://arxiv.org/abs/1902.09615}{Binscatter Regressions}. Working Paper.
 }
 \seealso{
-\code{\link{binsreg}}, \code{\link{binsregtest}}.
+\code{\link{binsreg}}, \code{\link{binstest}}.
 }
 \author{
-Matias D. Cattaneo, University of Michigan, Ann Arbor, MI. \email{cattaneo@umich.edu}.
+Matias D. Cattaneo, Princeton University, Princeton, NJ. \email{cattaneo@princeton.edu}.
 
 Richard K. Crump, Federal Reserve Bank of New York, New York, NY. \email{richard.crump@ny.frb.org}.
 
 Max H. Farrell, University of Chicago, Chicago, IL. \email{max.farrell@chicagobooth.edu}.
 
-Yingjie Feng (maintainer), University of Michigan, Ann Arbor, MI. \email{yjfeng@umich.edu}.
+Yingjie Feng (maintainer), Tsinghua University, Beijing, China. \email{fengyingjiepku@gmail.com}.
 }
