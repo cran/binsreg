@@ -1,11 +1,11 @@
-66eef27353ac513b8c7aedef8e1fe1ac *DESCRIPTION
+c0e0c2d65b65d506f0d67c1e6394970b *DESCRIPTION
 d9c7755705ec2368c3e84ff92a508ab6 *NAMESPACE
 cddea3a3d3216111e9f38fbf37eac83f *R/binsglm.R
 cccd0d2b5c883b47474738d6ff0aa5c8 *R/binspwc.R
 cf664cd1a5212665062040d29018f946 *R/binsqreg.R
 fa9a6b057c9928e262601a3e3b9f547c *R/binsreg-package.R
 fc896a9b1e540377d7230f4a1822fd78 *R/binsreg.R
-36b93fcde139f059a16cfc4533ab6bd4 *R/binsreg_functions.R
+07dccf4516b327f7f2c78d6954be6d95 *R/binsreg_functions.R
 7e48b2f8a3c4754cbcb3f83f80cd7bc5 *R/binsregselect.R
 3b3789cbe01eef6a06c79f72eb01bd57 *R/binstest.R
 45655a8e7a7798155eb0b6462b169b9a *man/binsglm.Rd

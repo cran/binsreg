@@ -1,4 +1,4 @@
-# 08/05/2021
+# 10/09/2021
 # binsreg package, supporting functions
 # p: degree of polynomial
 # s: number of cts (deriv) constraints
@@ -455,5 +455,10 @@ binsreg.model.mat <- function(formula=NULL, data=NULL) {
 }
 
 # check if an object is a formula
-is.formula <- function(x) is.call(x) && x[[1]] == quote(`~`)
-
+is.formula <- function(x) {
+  ind <- try(is.call(x) && x[[1]] == quote(`~`), silent = T)
+  if (inherits(ind, "try-error")) {
+    ind <- F
+  }
+  return(ind)
+}
