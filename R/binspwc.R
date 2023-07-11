@@ -1,7 +1,8 @@
 ########################################################################################
 #'@title  Data-Driven Pairwise Group Comparison using Binscatter Methods
 #'@description \code{binspwc} implements hypothesis testing procedures for pairwise group comparison of binscatter estimators, following the
-#'             results in \href{https://arxiv.org/abs/1902.09608}{Cattaneo, Crump, Farrell and Feng (2022a)}.
+#'             results in \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_AER.pdf}{Cattaneo, Crump, Farrell and Feng (2023a)} and
+#'             \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_NonlinearBinscatter.pdf}{Cattaneo, Crump, Farrell and Feng (2023b)}.
 #'             If the binning scheme is not set by the user, the companion function
 #'             \code{\link{binsregselect}} is used to implement binscatter in a data-driven way. Binned scatter plots based on different methods
 #'             can be constructed using the companion functions \code{\link{binsreg}}, \code{\link{binsqreg}} or \code{\link{binsglm}}.
@@ -27,8 +28,8 @@
 #'           subgroup separately, but see the option \code{samebinsby} below for imposing a common binning structure across subgroups.
 #'@param  pwc a vector or a logical value. If \code{pwc=c(p,s)}, a piecewise polynomial of degree \code{p} with \code{s}
 #'            smoothness constraints is used for testing the difference between groups.
-#'            If \code{pwc=T} or \code{pwc=NULL} (default) is specified, \code{pwc=c(1,1)} is used unless the degree \code{p} and smoothness \code{s} selection
-#'            is requested via the option \code{pselect} (see more details in the explanation of \code{pselect}).
+#'            If \code{pwc=T} or \code{pwc=NULL} (default) is specified, \code{pwc=c(1,1)} is used unless the degree \code{p} or smoothness \code{s} selection
+#'            is requested via the option \code{pselect} or \code{sselect} (see more details in the explanation of \code{pselect} and \code{sselect}).
 #'@param  testtype type of pairwise comparison test. The default is \code{testtype="two-sided"}, which corresponds to a two-sided test of the form \code{H0: mu_1(x)=mu_2(x)}.
 #'                 Other options are: \code{testtype="left"} for the one-sided test form \code{H0: mu_1(x)<=mu_2(x)} and \code{testtype="right"} for the one-sided test of the form \code{H0: mu_1(x)>=mu_2(x)}.
 #'@param  lp an Lp metric used for (two-sided) parametric model specification testing and/or shape restriction testing. The default is \code{lp=Inf}, which
@@ -63,16 +64,16 @@
 #'                   is not specified, then the number of bins is selected via the companion command \code{\link{binsregselect}} and
 #'                   using the full sample.
 #'@param  randcut upper bound on a uniformly distributed variable used to draw a subsample for bins/degree/smoothness selection.
-#'                Observations for which \code{runif()<=#} are used. # must be between 0 and 1. By default, \code{max(5,000, 0.01n)} observations
-#'                are used if the samples size \code{n>5,000}.
+#'                Observations for which \code{runif()<=#} are used. # must be between 0 and 1. By default, \code{max(5000, 0.01n)} observations
+#'                are used if the samples size \code{n>5000}.
 #'@param  nsims number of random draws for hypothesis testing. The default is
 #'              \code{nsims=500}, which corresponds to 500 draws from a standard Gaussian random vector of size
-#'              \code{[(p+1)*J - (J-1)*s]}. A larger number of draws is recommended to obtain the final results.
+#'              \code{[(p+1)*J - (J-1)*s]}. Setting at least \code{nsims=2000} is recommended to obtain the final results.
 #'@param  simsgrid number of evaluation points of an evenly-spaced grid within each bin used for evaluation of
 #'                 the supremum (infimum or Lp metric) operation needed to construct hypothesis testing
 #'                 procedures. The default is \code{simsgrid=20}, which corresponds to 20 evenly-spaced
 #'                 evaluation points within each bin for approximating the supremum (infimum or Lp metric) operator.
-#'                 A larger number of evaluation points is recommended to obtain the final results.
+#'                 Setting at least \code{simsgrid=50} is recommended to obtain the final results.
 #'@param  simsseed  seed for simulation.
 #'@param  vce procedure to compute the variance-covariance matrix estimator. For least squares regression and generalized linear regression, the allowed options are the same as that for \code{\link{binsreg}} or \code{\link{binsqreg}}.
 #'            For quantile regression, the allowed options are the same as that for \code{\link{binsqreg}}.
@@ -82,7 +83,7 @@
 #'@param  dfcheck adjustments for minimum effective sample size checks, which take into account number of unique
 #'                values of \code{x} (i.e., number of mass points), number of clusters, and degrees of freedom of
 #'                the different stat models considered. The default is \code{dfcheck=c(20, 30)}.
-#'                See \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2022_Stata.pdf}{Cattaneo, Crump, Farrell and Feng (2022b)} for more details.
+#'                See \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_Stata.pdf}{Cattaneo, Crump, Farrell and Feng (2023c)} for more details.
 #'@param  masspoints how mass points in \code{x} are handled. Available options:
 #'                   \itemize{
 #'                   \item \code{"on"} all mass point and degrees of freedom checks are implemented. Default.
@@ -116,14 +117,16 @@
 #'
 #' Richard K. Crump, Federal Reserve Bank of New York, New York, NY. \email{richard.crump@ny.frb.org}.
 #'
-#' Max H. Farrell, University of Chicago, Chicago, IL. \email{max.farrell@chicagobooth.edu}.
+#' Max H. Farrell, UC Santa Barbara, Santa Barbara, CA. \email{mhfarrell@gmail.com}.
 #'
 #' Yingjie Feng (maintainer), Tsinghua University, Beijing, China. \email{fengyingjiepku@gmail.com}.
 #'
 #'@references
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2022a: \href{https://arxiv.org/abs/1902.09608}{On Binscatter}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023a: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_AER.pdf}{On Binscatter}. Working Paper.
 #'
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2022b: \href{https://arxiv.org/abs/1902.09615}{Binscatter Regressions}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023b: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_NonlinearBinscatter.pdf}{Nonlinear Binscatter Methods}. Working Paper.
+#'
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023c: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_Stata.pdf}{Binscatter Regressions}. Working Paper.
 #'
 #'@seealso  \code{\link{binsreg}}, \code{\link{binsqreg}}, \code{\link{binsglm}}, \code{\link{binsregselect}}, \code{\link{binstest}}.
 #'
@@ -440,7 +443,7 @@ binspwc <- function(y, x, w=NULL,data=NULL, estmethod="reg", family=gaussian(),
   if (exit>0) stop()
 
   if (nsims<2000|simsgrid<50) {
-    print("Note: A large number of random draws/evaluation points is recommended to obtain the final results.")
+    print("Note: Setting at least nsims=2000 and simsgrid=50 is recommended to obtain the final results.")
   }
   ##################################################
   # Prepare options
@@ -455,7 +458,7 @@ binspwc <- function(y, x, w=NULL,data=NULL, estmethod="reg", family=gaussian(),
     }
   }
   if (selection=="U") {
-    warning("Testing procedures are valid when nbins is much larger than the IMSE-optimal choice.")
+    warning("Testing procedures are valid when nbins is much larger than the IMSE-optimal choice. Compare your choice with the IMSE-optimal one obtained by binsregselect().")
   }
 
 
@@ -560,7 +563,7 @@ binspwc <- function(y, x, w=NULL,data=NULL, estmethod="reg", family=gaussian(),
     randcut1k <- randcut
     if (is.null(randcut) & N>5000) {
       randcut1k <- max(5000/N, 0.01)
-      warning("To speed up computation, bin/degree selection uses a subsample of roughly max(5,000, 0.01n) observations if the sample size n>5,000. To use the full sample, set randcut=1.")
+      warning("To speed up computation, bin/degree selection uses a subsample of roughly max(5000, 0.01n) observations if the sample size n>5000. To use the full sample, set randcut=1.")
     }
     if (selection=="J") {
       binselect <- binsregselect(y, x, w, deriv=deriv,
@@ -727,7 +730,7 @@ binspwc <- function(y, x, w=NULL,data=NULL, estmethod="reg", family=gaussian(),
       randcut1k <- randcut
       if (is.null(randcut) & N>5000) {
         randcut1k <- max(5000/N, 0.01)
-        warning("To speed up computation, bin/degree selection uses a subsample of roughly max(5,000, 0.01n) observations if the sample size n>5,000. To use the full sample, set randcut=1.")
+        warning("To speed up computation, bin/degree selection uses a subsample of roughly max(5000, 0.01n) observations if the sample size n>5000. To use the full sample, set randcut=1.")
       }
       if (selection=="J") {
         binselect <- binsregselect(y.sub, x.sub, w.sub, deriv=deriv,

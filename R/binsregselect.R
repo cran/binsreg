@@ -53,7 +53,7 @@
 #'@param  dfcheck adjustments for minimum effective sample size checks, which take into account number of unique
 #'                values of \code{x} (i.e., number of mass points), number of clusters, and degrees of freedom of
 #'                the different statistical models considered. The default is \code{dfcheck=c(20, 30)}.
-#'                See \href{https://arxiv.org/abs/1902.09615}{Cattaneo, Crump, Farrell and Feng (2022b)} for more details.
+#'                See \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_Stata.pdf}{Cattaneo, Crump, Farrell and Feng (2023c)} for more details.
 #'@param  masspoints how mass points in \code{x} are handled. Available options:
 #'                   \itemize{
 #'                   \item \code{"on"} all mass point and degrees of freedom checks are implemented. Default.
@@ -103,14 +103,16 @@
 #'
 #' Richard K. Crump, Federal Reserve Bank of New York, New York, NY. \email{richard.crump@ny.frb.org}.
 #'
-#' Max H. Farrell, University of Chicago, Chicago, IL. \email{max.farrell@chicagobooth.edu}.
+#' Max H. Farrell, UC Santa Barbara, Santa Barbara, CA. \email{mhfarrell@gmail.com}.
 #'
 #' Yingjie Feng (maintainer), Tsinghua University, Beijing, China. \email{fengyingjiepku@gmail.com}.
 #'
 #'@references
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2022a: \href{https://arxiv.org/abs/1902.09608}{On Binscatter}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023a: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_AER.pdf}{On Binscatter}. Working Paper.
 #'
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2022b: \href{https://arxiv.org/abs/1902.09615}{Binscatter Regressions}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023b: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_NonlinearBinscatter.pdf}{Nonlinear Binscatter Methods}. Working Paper.
+#'
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023c: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_Stata.pdf}{Binscatter Regressions}. Working Paper.
 #'
 #'@seealso \code{\link{binsreg}}, \code{\link{binstest}}.
 #'

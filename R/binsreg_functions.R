@@ -1,4 +1,4 @@
-# 10/04/2022
+# 07/03/2023
 # binsreg package, supporting functions
 # p: degree of polynomial
 # s: number of cts (deriv) constraints

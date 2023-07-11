@@ -1,7 +1,8 @@
 ###########################################################################################################
 #'@title  Data-Driven Binscatter Generalized Linear Regression with Robust Inference Procedures and Plots
 #'@description \code{binsglm} implements binscatter generalized linear regression with robust inference procedures and plots, following the
-#'             results in \href{https://arxiv.org/abs/1902.09608}{Cattaneo, Crump, Farrell and Feng (2022a)}.
+#'             results in \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_AER.pdf}{Cattaneo, Crump, Farrell and Feng (2023a)} and
+#'             \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_NonlinearBinscatter.pdf}{Cattaneo, Crump, Farrell and Feng (2023b)}.
 #'             Binscatter provides a flexible way to describe the relationship between two variables, after
 #'             possibly adjusting for other covariates, based on partitioning/binning of the independent variable of interest.
 #'             The main purpose of this function is to generate binned scatter plots with curve estimation with robust pointwise confidence intervals and
@@ -23,8 +24,8 @@
 #'@param  dots a vector or a logical value. If \code{dots=c(p,s)}, a piecewise polynomial of degree \code{p} with
 #'             \code{s} smoothness constraints is used for point estimation and plotting as "dots".
 #'             The default is \code{dots=c(0,0)}, which corresponds to piecewise constant (canonical binscatter).
-#'             If \code{dots=T}, the default \code{dots=c(0,0)} is used unless the degree \code{p} and smoothness \code{s} selection
-#'             is requested via the option \code{pselect} (see more details in the explanation of \code{pselect}).
+#'             If \code{dots=T}, the default \code{dots=c(0,0)} is used unless the degree \code{p} or smoothness \code{s} selection
+#'             is requested via the option \code{pselect} or \code{sselect} (see more details in the explanation of \code{pselect} and \code{sselect}).
 #'             If \code{dots=F} is specified, the dots are not included in the plot.
 #'@param  dotsgrid number of dots within each bin to be plotted. Given the choice, these dots are point estimates
 #'                 evaluated over an evenly-spaced grid within each bin. The default is \code{dotsgrid=0}, and only
@@ -32,15 +33,15 @@
 #'@param  dotsgridmean If true, the dots corresponding to the point estimates evaluated at the mean of \code{x} within each bin
 #'                     are presented. By default, they are presented, i.e., \code{dotsgridmean=T}.
 #'@param  line a vector or a logical value. If \code{line=c(p,s)}, a piecewise polynomial of degree \code{p} with \code{s} smoothness constraints
-#'             is used for plotting as a "line". If \code{line=T} is specified, \code{line=c(0,0)} is used unless the degree \code{p} and smoothness \code{s}
-#'             selection is requested via the option \code{pselect} (see more details in the explanation of \code{pselect}).
+#'             is used for plotting as a "line". If \code{line=T} is specified, \code{line=c(0,0)} is used unless the degree \code{p} or smoothness \code{s}
+#'             selection is requested via the option \code{pselect} or \code{sselect} (see more details in the explanation of \code{pselect} and \code{sselect}).
 #'             If \code{line=F} or \code{line=NULL} is specified, the line is not included in the plot.  The default is \code{line=NULL}.
 #'@param  linegrid number of evaluation points of an evenly-spaced grid within each bin used for evaluation of
 #'                 the point estimate set by the \code{line=c(p,s)} option. The default is \code{linegrid=20},
 #'                 which corresponds to 20 evenly-spaced evaluation points within each bin for fitting/plotting the line.
 #'@param  ci a vector or a logical value. If \code{ci=c(p,s)} a piecewise polynomial of degree \code{p} with \code{s} smoothness constraints is used for
-#'             constructing confidence intervals. If \code{ci=T} is specified, \code{ci=c(1,1)} is used unless the degree \code{p} and smoothness \code{s}
-#'             selection is requested via the option \code{pselect} (see more details in the explanation of \code{pselect}).
+#'             constructing confidence intervals. If \code{ci=T} is specified, \code{ci=c(1,1)} is used unless the degree \code{p} or smoothness \code{s}
+#'             selection is requested via the option \code{pselect} or \code{sselect} (see more details in the explanation of \code{pselect} and \code{sselect}).
 #'             If \code{ci=F} or \code{ci=NULL} is specified, the confidence intervals are not included in the plot.  The default is \code{ci=NULL}.
 #'@param  cigrid number of evaluation points of an evenly-spaced grid within each bin used for evaluation of the point
 #'               estimate set by the \code{ci=c(p,s)} option. The default is \code{cigrid=1}, which corresponds to 1
@@ -48,8 +49,8 @@
 #'@param  cigridmean If true, the confidence intervals corresponding to the point estimates evaluated at the mean of \code{x} within each bin
 #'                   are presented. The default is \code{cigridmean=T}.
 #'@param  cb a vector or a logical value. If \code{cb=c(p,s)}, a the piecewise polynomial of degree \code{p} with \code{s} smoothness constraints is used for
-#'           constructing the confidence band. If the option \code{cb=T} is specified, \code{cb=c(1,1)} is used unless the degree \code{p} and smoothness \code{s}
-#'           selection is requested via the option \code{pselect} (see more details in the explanation of \code{pselect}).
+#'           constructing the confidence band. If the option \code{cb=T} is specified, \code{cb=c(1,1)} is used unless the degree \code{p} or smoothness \code{s}
+#'           selection is requested via the option \code{pselect} or \code{sselect} (see more details in the explanation of \code{pselect} and \code{sselect}).
 #'           If \code{cb=F} or \code{cb=NULL} is specified, the confidence band is not included in the plot. The default is \code{cb=NULL}.
 #'@param  cbgrid number of evaluation points of an evenly-spaced grid within each bin used for evaluation of the point
 #'               estimate set by the \code{cb=c(p,s)} option. The default is \code{cbgrid=20}, which corresponds
@@ -105,15 +106,15 @@
 #'                   is not specified, then the number of bins is selected via the companion command \code{\link{binsregselect}} and
 #'                   using the full sample.
 #'@param  randcut upper bound on a uniformly distributed variable used to draw a subsample for bins/degree/smoothness selection.
-#'                Observations for which \code{runif()<=#} are used. # must be between 0 and 1.  By default, \code{max(5,000, 0.01n)} observations
-#'                are used if the samples size \code{n>5,000}.
+#'                Observations for which \code{runif()<=#} are used. # must be between 0 and 1.  By default, \code{max(5000, 0.01n)} observations
+#'                are used if the samples size \code{n>5000}.
 #'@param  nsims number of random draws for constructing confidence bands. The default is
 #'              \code{nsims=500}, which corresponds to 500 draws from a standard Gaussian random vector of size
-#'              \code{[(p+1)*J - (J-1)*s]}. A larger number of draws is recommended to obtain the final results.
+#'              \code{[(p+1)*J - (J-1)*s]}. Setting at least \code{nsims=2000} is recommended to obtain the final results.
 #'@param  simsgrid number of evaluation points of an evenly-spaced grid within each bin used for evaluation of
 #'                 the supremum operation needed to construct confidence bands. The default is \code{simsgrid=20}, which corresponds to 20 evenly-spaced
 #'                 evaluation points within each bin for approximating the supremum operator.
-#'                 A larger number of evaluation points is recommended to obtain the final results.
+#'                 Setting at least \code{simsgrid=50} is recommended to obtain the final results.
 #'@param  simsseed  seed for simulation.
 #'@param  vce Procedure to compute the variance-covariance matrix estimator. Options are
 #'           \itemize{
@@ -135,7 +136,7 @@
 #'@param  dfcheck adjustments for minimum effective sample size checks, which take into account number of unique
 #'                values of \code{x} (i.e., number of mass points), number of clusters, and degrees of freedom of
 #'                the different stat models considered. The default is \code{dfcheck=c(20, 30)}.
-#'                See \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2022_Stata.pdf}{Cattaneo, Crump, Farrell and Feng (2022b)} for more details.
+#'                See \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_Stata.pdf}{Cattaneo, Crump, Farrell and Feng (2023c)} for more details.
 #'@param  masspoints how mass points in \code{x} are handled. Available options:
 #'                   \itemize{
 #'                   \item \code{"on"} all mass point and degrees of freedom checks are implemented. Default.
@@ -171,7 +172,9 @@
 #'        \item \code{data.polyci} Data for confidence intervals based on polynomial regression. It contains: \code{x}, evaluation points;
 #'                                \code{bin}, the indicator of bins;
 #'                                \code{isknot}, indicator of inner knots; \code{mid}, midpoint of each bin;
-#'                                \code{polyci.l} and \code{polyci.r}, left and right boundaries of each confidence intervals.}}
+#'                                \code{polyci.l} and \code{polyci.r}, left and right boundaries of each confidence intervals.
+#'        \item \code{data.bin} Data for the binning structure. It contains: \code{bin.id}, ID for each bin;
+#'                                \code{left.endpoint} and \code{right.endpoint}, left and right endpoints of each bin.}}
 #'        \item{\code{imse.var.rot}}{Variance constant in IMSE, ROT selection.}
 #'        \item{\code{imse.bsq.rot}}{Bias constant in IMSE, ROT selection.}
 #'        \item{\code{imse.var.dpi}}{Variance constant in IMSE, DPI selection.}
@@ -188,14 +191,16 @@
 #'
 #' Richard K. Crump, Federal Reserve Bank of New York, New York, NY. \email{richard.crump@ny.frb.org}.
 #'
-#' Max H. Farrell, University of Chicago, Chicago, IL. \email{max.farrell@chicagobooth.edu}.
+#' Max H. Farrell, UC Santa Barbara, Santa Barbara, CA. \email{mhfarrell@gmail.com}.
 #'
 #' Yingjie Feng (maintainer), Tsinghua University, Beijing, China. \email{fengyingjiepku@gmail.com}.
 #'
 #'@references
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2022a: \href{https://arxiv.org/abs/1902.09608}{On Binscatter}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023a: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_AER.pdf}{On Binscatter}. Working Paper.
 #'
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2022b: \href{https://arxiv.org/abs/1902.09615}{Binscatter Regressions}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023b: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_NonlinearBinscatter.pdf}{Nonlinear Binscatter Methods}. Working Paper.
+#'
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023c: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_Stata.pdf}{Binscatter Regressions}. Working Paper.
 #'
 #'@seealso \code{\link{binsregselect}}, \code{\link{binstest}}.
 #'
@@ -632,7 +637,7 @@ binsglm  <- function(y, x, w=NULL, data=NULL, at=NULL, family=gaussian(), deriv=
   }
   if (selection=="U") {
     if (!is.null(ci)|!is.null(cb)) {
-      warning("Confidence intervals/bands are valid when nbins is much larger than the IMSE-optimal choice.")
+      warning("Confidence intervals/bands are valid when nbins is much larger than the IMSE-optimal choice. Compare your choice with the IMSE-optimal one obtained by binsregselect().")
     }
   }
 
@@ -774,7 +779,7 @@ binsglm  <- function(y, x, w=NULL, data=NULL, at=NULL, family=gaussian(), deriv=
       randcut1k <- randcut
       if (is.null(randcut) & N>5000) {
         randcut1k <- max(5000/N, 0.01)
-        warning("To speed up computation, bin/degree selection uses a subsample of roughly max(5,000, 0.01n) observations if the sample size n>5,000. To use the full sample, set randcut=1.")
+        warning("To speed up computation, bin/degree selection uses a subsample of roughly max(5000, 0.01n) observations if the sample size n>5000. To use the full sample, set randcut=1.")
       }
       if (selection=="J") {
         binselect <- binsregselect(y, x, w, deriv=deriv,
@@ -944,7 +949,7 @@ binsglm  <- function(y, x, w=NULL, data=NULL, at=NULL, family=gaussian(), deriv=
         randcut1k <- randcut
         if (is.null(randcut) & N>5000) {
           randcut1k <- max(5000/N, 0.01)
-          warning("To speed up computation, bin/degree selection uses a subsample of roughly max(5,000, 0.01n) obs if the sample size n>5,000. To use the full sample, set randcut=1.")
+          warning("To speed up computation, bin/degree selection uses a subsample of roughly max(5000, 0.01n) obs if the sample size n>5000. To use the full sample, set randcut=1.")
         }
         if (selection=="J") {
           binselect <- binsregselect(y.sub, x.sub, w.sub, deriv=deriv,
@@ -1489,7 +1494,7 @@ binsglm  <- function(y, x, w=NULL, data=NULL, at=NULL, family=gaussian(), deriv=
     }
     if (cbON) {
       if (nsims<2000|simsgrid<50) {
-        print("Note: A large number of random draws/evaluation points is recommended to obtain the final results.")
+        print("Note: Setting at least nsims=2000 and simsgrid=50 is recommended to obtain the final results.")
       }
       grid <- binsreg.grid(knot, cbgrid, addmore=T)
       cb.x <- grid$eval; cb.bin <- grid$bin
@@ -1561,6 +1566,13 @@ binsglm  <- function(y, x, w=NULL, data=NULL, at=NULL, family=gaussian(), deriv=
     }
     cval.by <- c(cval.by, cval)
 
+    # save bin information
+    if (nbins==length(knot)) {
+      data.by$data.bin <- data.frame(group=byvals[i], bin.id=1:nbins, left.endpoint=knot, right.endpoint=knot)
+    } else {
+      data.by$data.bin <- data.frame(group=byvals[i], bin.id=1:nbins, left.endpoint=knot[-(nbins+1)], right.endpoint=knot[-1])
+    }
+
     # Save all data for each group
     data.plot[[i]] <- data.by
     names(data.plot)[i] <- paste("Group", byvals[i], sep=" ")
@@ -1568,7 +1580,7 @@ binsglm  <- function(y, x, w=NULL, data=NULL, at=NULL, family=gaussian(), deriv=
   }
 
   ########################################
-  ############# Ploting ? ################
+  ############# Plotting ? ################
   binsplot <- NULL
   if (!noplot) {
     binsplot <- ggplot() + theme_bw()
