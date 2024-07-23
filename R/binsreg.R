@@ -1,8 +1,8 @@
 ####################################################################################################
 #'@title  Data-Driven Binscatter Least Squares Regression with Robust Inference Procedures and Plots
 #'@description \code{binsreg} implements binscatter least squares regression with robust inference procedures and plots, following the
-#'             results in \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_AER.pdf}{Cattaneo, Crump, Farrell and Feng (2023a)} and
-#'             \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_NonlinearBinscatter.pdf}{Cattaneo, Crump, Farrell and Feng (2023b)}.
+#'             results in \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_AER.pdf}{Cattaneo, Crump, Farrell and Feng (2024a)} and
+#'             \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_NonlinearBinscatter.pdf}{Cattaneo, Crump, Farrell and Feng (2024b)}.
 #'             Binscatter provides a flexible way to describe the mean relationship between two variables, after
 #'             possibly adjusting for other covariates, based on partitioning/binning of the independent variable of interest.
 #'             The main purpose of this function is to generate binned scatter plots with curve estimation with robust pointwise confidence intervals and
@@ -134,7 +134,7 @@
 #'@param  dfcheck adjustments for minimum effective sample size checks, which take into account number of unique
 #'                values of \code{x} (i.e., number of mass points), number of clusters, and degrees of freedom of
 #'                the different statistical models considered. The default is \code{dfcheck=c(20, 30)}.
-#'                See \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_Stata.pdf}{Cattaneo, Crump, Farrell and Feng (2023c)} for more details.
+#'                See \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_Stata.pdf}{Cattaneo, Crump, Farrell and Feng (2024c)} for more details.
 #'@param  masspoints how mass points in \code{x} are handled. Available options:
 #'                   \itemize{
 #'                   \item \code{"on"} all mass point and degrees of freedom checks are implemented. Default.
@@ -193,11 +193,11 @@
 #' Yingjie Feng (maintainer), Tsinghua University, Beijing, China. \email{fengyingjiepku@gmail.com}.
 #'
 #'@references
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023a: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_AER.pdf}{On Binscatter}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2024a: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_AER.pdf}{On Binscatter}. American Economic Review 114(5): 1488-1514.
 #'
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023b: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_NonlinearBinscatter.pdf}{Nonlinear Binscatter Methods}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2024b: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_NonlinearBinscatter.pdf}{Nonlinear Binscatter Methods}. Working Paper.
 #'
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023c: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_Stata.pdf}{Binscatter Regressions}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2024c: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_Stata.pdf}{Binscatter Regressions}. Working Paper.
 #'
 #'@seealso \code{\link{binsregselect}}, \code{\link{binstest}}.
 #'
@@ -339,6 +339,7 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
   if (is.logical(dots)) if (!dots) {
     dots <- NULL
     dotsgrid <- 0
+    dotsgridmean <- F
   }
   if (is.logical(line)) if (!line) line <- NULL
   if (is.logical(ci)) if (!ci) ci <- NULL
@@ -504,22 +505,22 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
     print("p<s not allowed.")
     exit <- 1
   }
-  # if (dots[1] < deriv) {
-  #   print("p<deriv not allowed.")
-  #   exit <- 1
-  # }
-  # if (!is.null(line)) if (line[1] < deriv) {
-  #   print("p<deriv not allowed.")
-  #   exit <- 1
-  # }
-  # if (!is.null(ci)) if (ci[1] < deriv) {
-  #   print("p<deriv not allowed.")
-  #   exit <- 1
-  # }
-  # if (!is.null(cb)) if (cb[1] < deriv) {
-  #   print("p<deriv not allowed.")
-  #   exit <- 1
-  # }
+  if (!is.null(dots)) if (is.numeric(dots)) if (dots[1] < deriv) {
+    print("p<deriv not allowed.")
+    exit <- 1
+  }
+  if (!is.null(line)) if (is.numeric(line)) if (line[1] < deriv) {
+    print("p<deriv not allowed.")
+    exit <- 1
+  }
+  if (!is.null(ci)) if (is.numeric(ci)) if (ci[1] < deriv) {
+    print("p<deriv not allowed.")
+    exit <- 1
+  }
+  if (!is.null(cb)) if (is.numeric(cb)) if (cb[1] < deriv) {
+    print("p<deriv not allowed.")
+    exit <- 1
+  }
   if (binsmethod!="dpi" & binsmethod!="rot") {
     print("Bin selection method incorrectly specified.")
     exit <- 1
@@ -1147,7 +1148,6 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
     } else {
       eval.w <- NULL
     }
-
     ##################################
     # Dots and CIs for Small eN case
     ##################################
@@ -1416,7 +1416,6 @@ binsreg <- function(y, x, w=NULL, data=NULL, at=NULL, deriv=0,
       k.new <- sum(pos)
       cb.pred <- binsreg.pred(X=basis, model=model.cb, type="all", vce=vce,
                               cluster=cluster.sub, deriv=deriv, wvec=eval.w, avar=asyvar)
-
       ### Compute cval ####
       x.grid <- binsreg.grid(knot, simsgrid)$eval
       basis.sim <- binsreg.spdes(eval=x.grid, p=cb.p, s=cb.s, knot=knot, deriv=deriv)

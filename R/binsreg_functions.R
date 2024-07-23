@@ -1,4 +1,4 @@
-# 07/03/2023
+# 07/16/2024
 # binsreg package, supporting functions
 # p: degree of polynomial
 # s: number of cts (deriv) constraints
@@ -174,8 +174,8 @@ binsreg.pval <- function(num, denom, rep, tstat=NULL, side=NULL, alpha, lp=Inf) 
 }
 
 # pval used only by binspwc
-binspwc.pval <- function(nummat1, nummat2, denom1, denom2, rep, tstat=NULL, testtype=NULL, lp=Inf) {
-  pval <- 0
+binspwc.pval <- function(nummat1, nummat2, denom1, denom2, rep, tstat=NULL, testtype=NULL, lp=Inf, alpha=95) {
+  pval <- 0; tvec <- c()
   k1 <- ncol(nummat1); k2 <- ncol(nummat2)
 
   for (i in 1:rep) {
@@ -192,9 +192,13 @@ binspwc.pval <- function(nummat1, nummat2, denom1, denom2, rep, tstat=NULL, test
       if (is.infinite(lp)) pval <- pval + (max(abs(tx)) >= tstat)
       else                 pval <- pval + (mean(abs(tx)^lp)^(1/lp) >= tstat)
     }
+
+    # for critical value (only used for confidence band)
+    tvec[i] <- max(abs(tx))
   }
   pval <- pval / rep
-  return(pval)
+  cval.cb <- quantile(tvec, alpha/100, na.rm=T, names = F, type=2)
+  return(list(pval=pval, cval.cb=cval.cb))
 }
 
 # IMSE V constant
@@ -378,7 +382,6 @@ genB <- function(y, x, w, p, s, deriv, knot, weights=NULL) {
   }
   bias.l2 <- bias.v - basis[,pos,drop=F] %*% beta[pos]
   bias.cons <- binsreg.summ(bias.l2^2, w=weights, std=F)$mu
-
   return(bias.cons)
 }
 
@@ -398,10 +401,9 @@ binsregselect.dpi <- function(y, x, w, p, s, deriv, es=F, vce, cluster=NULL, nbi
   imse.b <- genB(y, x, w, p, s, deriv, knot, weights=weights) * J.rot^(2*(ord-deriv))
 
   # variance constant
-  imse.v <- genV(y, x, w, p, s, deriv, knot, vce, cluster, weights=weights) / (J.rot^(1+2*deriv))
-
+  genV_val <- genV(y, x, w, p, s, deriv, knot, vce, cluster, weights=weights)
+  imse.v <- genV_val / (J.rot^(1+2*deriv))
   J.dpi <- ceiling((imse.b*2*(ord-deriv)/((1+2*deriv)*imse.v))^(1/(2*ord+1)))
-
   return(list(J.dpi=J.dpi, imse.v=imse.v, imse.b=imse.b))
 }
 

@@ -1,8 +1,8 @@
 ###########################################################################################################
 #'@title  Data-Driven Binscatter Generalized Linear Regression with Robust Inference Procedures and Plots
 #'@description \code{binsglm} implements binscatter generalized linear regression with robust inference procedures and plots, following the
-#'             results in \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_AER.pdf}{Cattaneo, Crump, Farrell and Feng (2023a)} and
-#'             \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_NonlinearBinscatter.pdf}{Cattaneo, Crump, Farrell and Feng (2023b)}.
+#'             results in \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_AER.pdf}{Cattaneo, Crump, Farrell and Feng (2024a)} and
+#'             \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_NonlinearBinscatter.pdf}{Cattaneo, Crump, Farrell and Feng (2024b)}.
 #'             Binscatter provides a flexible way to describe the relationship between two variables, after
 #'             possibly adjusting for other covariates, based on partitioning/binning of the independent variable of interest.
 #'             The main purpose of this function is to generate binned scatter plots with curve estimation with robust pointwise confidence intervals and
@@ -19,7 +19,7 @@
 #'           \code{data} is specified). Note that when \code{at="mean"} or \code{at="median"}, all factor variables (if specified) are excluded from the evaluation (set as zero).
 #'@param  family a description of the error distribution and link function to be used in the generalized linear model. (See \code{\link{family}} for details of family functions.)
 #'@param  deriv  derivative order of the regression function for estimation, testing and plotting.
-#'               The default is \code{deriv=0}, which corresponds to the function itself. If \code{nolink=TRUE}, \code{deriv} cannot be greater than 1.
+#'               The default is \code{deriv=0}, which corresponds to the function itself. If \code{nolink=FALSE}, \code{deriv} cannot be greater than 1.
 #'@param  nolink if true, the function within the inverse link function is reported instead of the conditional mean function for the outcome.
 #'@param  dots a vector or a logical value. If \code{dots=c(p,s)}, a piecewise polynomial of degree \code{p} with
 #'             \code{s} smoothness constraints is used for point estimation and plotting as "dots".
@@ -136,7 +136,7 @@
 #'@param  dfcheck adjustments for minimum effective sample size checks, which take into account number of unique
 #'                values of \code{x} (i.e., number of mass points), number of clusters, and degrees of freedom of
 #'                the different stat models considered. The default is \code{dfcheck=c(20, 30)}.
-#'                See \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_Stata.pdf}{Cattaneo, Crump, Farrell and Feng (2023c)} for more details.
+#'                See \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_Stata.pdf}{Cattaneo, Crump, Farrell and Feng (2024c)} for more details.
 #'@param  masspoints how mass points in \code{x} are handled. Available options:
 #'                   \itemize{
 #'                   \item \code{"on"} all mass point and degrees of freedom checks are implemented. Default.
@@ -196,11 +196,11 @@
 #' Yingjie Feng (maintainer), Tsinghua University, Beijing, China. \email{fengyingjiepku@gmail.com}.
 #'
 #'@references
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023a: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_AER.pdf}{On Binscatter}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2024a: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_AER.pdf}{On Binscatter}. American Economic Review 114(5): 1488-1514.
 #'
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023b: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_NonlinearBinscatter.pdf}{Nonlinear Binscatter Methods}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2024b: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_NonlinearBinscatter.pdf}{Nonlinear Binscatter Methods}. Working Paper.
 #'
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023c: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_Stata.pdf}{Binscatter Regressions}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2024c: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_Stata.pdf}{Binscatter Regressions}. Working Paper.
 #'
 #'@seealso \code{\link{binsregselect}}, \code{\link{binstest}}.
 #'
@@ -337,6 +337,14 @@ binsglm  <- function(y, x, w=NULL, data=NULL, at=NULL, family=gaussian(), deriv=
   if (is.null(at))  at <- "mean"
 
   # extract family obj
+  if (is.character(family))
+    family <- get(family, mode = "function", envir = parent.frame())
+  if (is.function(family))
+    family <- family()
+  if (is.null(family$family)) {
+    print(family)
+    stop("'family' not recognized")
+  }
   familyname <- family$family
   linkinv    <- family$linkinv
   linkinv.1  <- family$mu.eta           # 1st deriv of inverse link
@@ -365,6 +373,7 @@ binsglm  <- function(y, x, w=NULL, data=NULL, at=NULL, family=gaussian(), deriv=
   if (is.logical(dots)) if (!dots) {
     dots <- NULL
     dotsgrid <- 0
+    dotsgridmean <- F
   }
   if (is.logical(line)) if (!line) line <- NULL
   if (is.logical(ci)) if (!ci) ci <- NULL
@@ -499,7 +508,7 @@ binsglm  <- function(y, x, w=NULL, data=NULL, at=NULL, family=gaussian(), deriv=
     exit <- 1
   }
   if (!nolink & deriv>1) {
-    print("Derivative should be no greater than 1 when the conditional mean is requrested.")
+    print("Derivative should be no greater than 1 when the conditional mean is requested.")
     exit <- 1
   }
   if (dotsgrid<0|linegrid<0|cigrid<0|cbgrid<0|polyreggrid<0|polyregcigrid<0) {
@@ -533,22 +542,22 @@ binsglm  <- function(y, x, w=NULL, data=NULL, at=NULL, family=gaussian(), deriv=
     print("p<s not allowed.")
     exit <- 1
   }
-  # if (dots[1] < deriv) {
-  #   print("p<deriv not allowed.")
-  #   exit <- 1
-  # }
-  # if (!is.null(line)) if (line[1] < deriv) {
-  #   print("p<deriv not allowed.")
-  #   exit <- 1
-  # }
-  # if (!is.null(ci)) if (ci[1] < deriv) {
-  #   print("p<deriv not allowed.")
-  #   exit <- 1
-  # }
-  # if (!is.null(cb)) if (cb[1] < deriv) {
-  #   print("p<deriv not allowed.")
-  #   exit <- 1
-  # }
+  if (!is.null(dots)) if (is.numeric(dots)) if (dots[1] < deriv) {
+    print("p<deriv not allowed.")
+    exit <- 1
+  }
+  if (!is.null(line)) if (is.numeric(line)) if (line[1] < deriv) {
+    print("p<deriv not allowed.")
+    exit <- 1
+  }
+  if (!is.null(ci)) if (is.numeric(ci)) if (ci[1] < deriv) {
+    print("p<deriv not allowed.")
+    exit <- 1
+  }
+  if (!is.null(cb)) if (is.numeric(cb)) if (cb[1] < deriv) {
+    print("p<deriv not allowed.")
+    exit <- 1
+  }
   if (binsmethod!="dpi" & binsmethod!="rot") {
     print("Bin selection method incorrectly specified.")
     exit <- 1
@@ -1470,6 +1479,9 @@ binsglm  <- function(y, x, w=NULL, data=NULL, at=NULL, family=gaussian(), deriv=
           if (!is.null(eval.w)) {
             basis.ci.0 <- cbind(basis.0, outer(rep(1, nrow(basis.0)), eval.w))
             basis.ci   <- cbind(basis, outer(rep(1, nrow(basis)), rep(0, nwvar)))
+          } else {
+            basis.ci.0 <- basis.0
+            basis.ci   <- basis
           }
           basis.all <- linkinv.2(fit.0)*ci.pred$fit*basis.ci.0 + pred.ci.0*basis.ci
           ci.pred$fit <- pred.ci.0 * ci.pred$fit
@@ -1537,6 +1549,9 @@ binsglm  <- function(y, x, w=NULL, data=NULL, at=NULL, family=gaussian(), deriv=
           if (!is.null(eval.w)) {
             basis.cb.0 <- cbind(basis.0, outer(rep(1, nrow(basis.0)), eval.w))
             basis.cb   <- cbind(basis,   outer(rep(1, nrow(basis)), rep(0, nwvar)))
+          } else {
+            basis.cb.0 <- basis.0
+            basis.cb   <- basis
           }
           basis.all <- linkinv.2(fit.0)*cb.pred$fit*basis.cb.0 + pred.cb.0*basis.cb
           cb.pred$fit <- pred.cb.0 * cb.pred$fit

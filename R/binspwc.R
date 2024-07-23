@@ -1,8 +1,9 @@
 ########################################################################################
 #'@title  Data-Driven Pairwise Group Comparison using Binscatter Methods
-#'@description \code{binspwc} implements hypothesis testing procedures for pairwise group comparison of binscatter estimators, following the
-#'             results in \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_AER.pdf}{Cattaneo, Crump, Farrell and Feng (2023a)} and
-#'             \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_NonlinearBinscatter.pdf}{Cattaneo, Crump, Farrell and Feng (2023b)}.
+#'@description \code{binspwc} implements hypothesis testing procedures for pairwise group comparison of binscatter estimators
+#'             and plots confidence bands for the difference in binscatter parameters between each pair of groups, following the
+#'             results in \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_AER.pdf}{Cattaneo, Crump, Farrell and Feng (2024a)} and
+#'             \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_NonlinearBinscatter.pdf}{Cattaneo, Crump, Farrell and Feng (2024b)}.
 #'             If the binning scheme is not set by the user, the companion function
 #'             \code{\link{binsregselect}} is used to implement binscatter in a data-driven way. Binned scatter plots based on different methods
 #'             can be constructed using the companion functions \code{\link{binsreg}}, \code{\link{binsqreg}} or \code{\link{binsglm}}.
@@ -32,8 +33,9 @@
 #'            is requested via the option \code{pselect} or \code{sselect} (see more details in the explanation of \code{pselect} and \code{sselect}).
 #'@param  testtype type of pairwise comparison test. The default is \code{testtype="two-sided"}, which corresponds to a two-sided test of the form \code{H0: mu_1(x)=mu_2(x)}.
 #'                 Other options are: \code{testtype="left"} for the one-sided test form \code{H0: mu_1(x)<=mu_2(x)} and \code{testtype="right"} for the one-sided test of the form \code{H0: mu_1(x)>=mu_2(x)}.
-#'@param  lp an Lp metric used for (two-sided) parametric model specification testing and/or shape restriction testing. The default is \code{lp=Inf}, which
-#'           corresponds to the sup-norm of the t-statistic. Other options are \code{lp=q} for a positive integer \code{q}.
+#'@param  lp an Lp metric used for pairwise comparison tests. The default is \code{lp=Inf}, which
+#'           corresponds to the sup-norm of the t-statistic. Other options are \code{lp=q} for a positive number \code{q>=1}.
+#'           Note that \code{lp=Inf} ("sup-norm") has to be used for one-sided tests (\code{testtype="left"} or \code{testtype="right"}).
 #'@param  bins A vector. If \code{bins=c(p,s)}, it sets the piecewise polynomial of degree \code{p} with \code{s} smoothness constraints
 #'             for data-driven (IMSE-optimal) selection of the partitioning/binning scheme. The default is \code{bins=c(0,0)}, which corresponds to the piecewise constant.
 #'@param  bynbins a vector of the number of bins for partitioning/binning of \code{x}, which is applied to the binscatter estimation for each group.
@@ -83,7 +85,7 @@
 #'@param  dfcheck adjustments for minimum effective sample size checks, which take into account number of unique
 #'                values of \code{x} (i.e., number of mass points), number of clusters, and degrees of freedom of
 #'                the different stat models considered. The default is \code{dfcheck=c(20, 30)}.
-#'                See \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_Stata.pdf}{Cattaneo, Crump, Farrell and Feng (2023c)} for more details.
+#'                See \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_Stata.pdf}{Cattaneo, Crump, Farrell and Feng (2024c)} for more details.
 #'@param  masspoints how mass points in \code{x} are handled. Available options:
 #'                   \itemize{
 #'                   \item \code{"on"} all mass point and degrees of freedom checks are implemented. Default.
@@ -96,14 +98,35 @@
 #'@param  weights an optional vector of weights to be used in the fitting process. Should be \code{NULL} or
 #'                a numeric vector. For more details, see \code{\link{lm}}.
 #'@param  subset  optional rule specifying a subset of observations to be used.
-#'@param  numdist  number of distinct for selection. Used to speed up computation.
+#'@param  numdist  number of distinct values for selection. Used to speed up computation.
 #'@param  numclust number of clusters for selection. Used to speed up computation.
-#'@param  estmethodopt a list of optional arguments used by \code{\link{rq}} (for quantile regression) or \code{\link{glm}} (for fitting generalized linear models).
-#'@param  ...     optional arguments to control bootstrapping if \code{estmethod="qreg"} and \code{vce="boot"}. See \code{\link{boot.rq}}.
+#'@param  estmethodopt a list of optional arguments used by \code{\link[quantreg]{rq}} (for quantile regression) or \code{\link{glm}} (for fitting generalized linear models).
+#'@param  plot  if true, the confidence bands for all pairwise group comparisons (the difference between each pair of groups) are plotted.
+#'              The degree and smoothness of polynomials used to construct the bands are the same as those specified for testing. The default is \code{plot=F}, i.e.,
+#'              no plot is generated.
+#'@param  dotsngrid number of dots to be added to the plot for confidence bands. Given the choice, these dots are point estimates of the difference between groups
+#'                 evaluated over an evenly-spaced grid within the common support of all groups. The default is \code{dotsngrid=0}, i.e., no point estimates
+#'                 are added. Whenever possible, the degree and smoothness of the polynomial for these point estimates are the same as those for selecting the number of bins;
+#'                 otherwise, the degree and smoothness specified for testing are used.
+#'@param  plotxrange a vector. \code{plotxrange=c(min, max)} specifies a range of the x-axis for plotting. Observations outside the range are dropped in the plot.
+#'@param  plotyrange a vector. \code{plotyrange=c(min, max)} specifies a range of the y-axis for plotting. Observations outside the range are dropped in the plot.
+#'@param  colors  an ordered list of colors for plotting the difference between each pair of groups.
+#'@param  symbols an ordered list of symbols for plotting the difference between each pair of groups.
+#'@param  level nominal confidence level for confidence band estimation. Default is \code{level=95}.
+#'@param  ...   optional arguments to control bootstrapping if \code{estmethod="qreg"} and \code{vce="boot"}. See \code{\link[quantreg]{boot.rq}}.
 #'@return \item{\code{stat}}{A matrix. Each row corresponds to the comparison between two groups. The first column is the test statistic. The second and third columns give the corresponding group numbers.
 #'                           The null hypothesis is \code{mu_i(x)<=mu_j(x)}, \code{mu_i(x)=mu_j(x)}, or \code{mu_i(x)>=mu_j(x)} for group i (given in the second column) and group j (given in the third column).
 #'                           The group number corresponds to the list of group names given by \code{opt$byvals}.}
 #'        \item{\code{pval}}{A vector of p-values for all pairwise group comparisons.}
+#'        \item{\code{bins_plot}}{A \code{ggplot} object for confidence bands plot.}
+#'        \item{\code{data.plot}}{A list containing data for plotting. Each item is a sublist of data frames for comparison between each pair of groups. Each sublist may contain the following data frames:
+#'        \itemize{
+#'        \item \code{data.dots} Data for dots. It contains: \code{pair}, the name for the pair of groups; \code{x}, evaluation points; \code{diff.fit}, point estimates of the group difference;
+#'        \item \code{data.cb} Data for confidence bands. It contains: \code{pair}, the name for the pair of groups; \code{x}, evaluation points; \code{cb.fit}, point estimates of the group difference;
+#'                             \code{cb.se}, standard errors; \code{cb.l} and \code{cb.r}, left and right boundaries of the confidence band.
+#'        }
+#'        }
+#'        \item{\code{cval.cb}}{A vector of critical values for all pairwise group comparisons.}
 #'        \item{\code{imse.var.rot}}{Variance constant in IMSE expansion, ROT selection.}
 #'        \item{\code{imse.bsq.rot}}{Bias constant in IMSE expansion, ROT selection.}
 #'        \item{\code{imse.var.dpi}}{Variance constant in IMSE expansion, DPI selection.}
@@ -122,11 +145,11 @@
 #' Yingjie Feng (maintainer), Tsinghua University, Beijing, China. \email{fengyingjiepku@gmail.com}.
 #'
 #'@references
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023a: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_AER.pdf}{On Binscatter}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2024a: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_AER.pdf}{On Binscatter}. American Economic Review 114(5): 1488-1514.
 #'
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023b: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_NonlinearBinscatter.pdf}{Nonlinear Binscatter Methods}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2024b: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_NonlinearBinscatter.pdf}{Nonlinear Binscatter Methods}. Working Paper.
 #'
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023c: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_Stata.pdf}{Binscatter Regressions}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2024c: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_Stata.pdf}{Binscatter Regressions}. Working Paper.
 #'
 #'@seealso  \code{\link{binsreg}}, \code{\link{binsqreg}}, \code{\link{binsglm}}, \code{\link{binsregselect}}, \code{\link{binstest}}.
 #'
@@ -145,7 +168,9 @@ binspwc <- function(y, x, w=NULL,data=NULL, estmethod="reg", family=gaussian(),
                     nsims=500, simsgrid=20, simsseed=NULL,
                     vce=NULL, cluster=NULL, asyvar=F,
                     dfcheck=c(20,30), masspoints="on", weights=NULL, subset=NULL,
-                    numdist=NULL, numclust=NULL, estmethodopt=NULL, ...) {
+                    numdist=NULL, numclust=NULL, estmethodopt=NULL,
+                    plot=FALSE, dotsngrid=0, plotxrange=NULL, plotyrange=NULL,
+                    colors=NULL, symbols=NULL, level=95, ...) {
 
   # param for internal use
   qrot <- 2
@@ -261,6 +286,14 @@ binspwc <- function(y, x, w=NULL,data=NULL, estmethod="reg", family=gaussian(),
   if (is.null(at))  at <- "mean"
 
   # change method name if needed
+  if (is.character(family))
+    family <- get(family, mode = "function", envir = parent.frame())
+  if (is.function(family))
+    family <- family()
+  if (is.null(family$family)) {
+    print(family)
+    stop("'family' not recognized")
+  }
   if (!is.null(family)) if (family$family!="gaussian" | family$link!="identity") {
     estmethod <- "glm"
   }
@@ -440,6 +473,14 @@ binspwc <- function(y, x, w=NULL,data=NULL, estmethod="reg", family=gaussian(),
   if ((length(pwc)>=1)&(length(bins)>=1)) if (!is.logical(pwc)) if (pwc[1]<=bins[1]) {
      warning("p for testing > p for bin selection is suggested.")
   }
+  if (lp<1) {
+    print("lp has to be no less than 1.")
+    exit <- 1
+  }
+  if (testtype=="left"| testtype=="right") if (lp!=Inf) {
+    print("Sup-norm (lp=Inf) has to be used for one-sided tests.")
+    exit <- 1
+  }
   if (exit>0) stop()
 
   if (nsims<2000|simsgrid<50) {
@@ -584,7 +625,7 @@ binspwc <- function(y, x, w=NULL,data=NULL, estmethod="reg", family=gaussian(),
         nbins_all <- binselect$nbinsdpi
         imse.v.dpi <- rep(binselect$imse.var.dpi, ngroup)
         imse.b.dpi <- rep(binselect$imse.bsq.dpi, ngroup)
-        if (is.na(nbins)) {
+        if (is.na(nbins_all)) {
           warning("DPI selection fails. ROT choice used.")
           nbins_all <- binselect$nbinsrot.regul
           imse.v.rot <- rep(binselect$imse.var.rot, ngroup)
@@ -643,8 +684,30 @@ binspwc <- function(y, x, w=NULL,data=NULL, estmethod="reg", family=gaussian(),
 
   ##########################################
   if (!is.null(simsseed)) set.seed(simsseed)
-  # common grid
+  # common grid (within the common support of all groups)
   uni_grid <- seq(max(xminmat), min(xmaxmat), length=simsgrid+2)[-c(1,simsgrid+2)]
+
+  # dots grid for plotting (within the common support of all groups)
+  if (plot) if (dotsngrid!=0) {
+    dots_grid <- seq(max(xminmat), min(xmaxmat), length=dotsngrid+2)[-c(1,dotsngrid+2)]
+  }
+  tot.num <- ngroup*(ngroup-1)/2    # total number of comparisons
+  if (plot) {
+    if (length(colors)==0) {
+      colors <- c("navy", "maroon", "forestgreen", "darkorange", "lavenderblush3",
+                  "khaki", "sienna", "steelblue", "brown", "gold", "gray45")
+      colors <- rep(colors, length.out=tot.num)
+    } else {
+      colors <- rep(colors, length.out=tot.num)
+    }
+
+    if (length(symbols)==0) {
+      symbols <- c(19, 15:18, 0:14)
+      symbols <- rep(symbols, length.out=tot.num)
+    } else {
+      symbols <- rep(symbols, length.out=tot.num)
+    }
+  }
 
   # adjust w variables
   if (!is.null(w)) {
@@ -668,11 +731,11 @@ binspwc <- function(y, x, w=NULL,data=NULL, estmethod="reg", family=gaussian(),
   }
 
   ##################################################################
-  N.by <- Ndist.by <- Nclust.by <- nbins.by <- cval.by <- NULL   # save results
-  fit.sha <- se.sha <- nummat <- denom <- list()
-  tstat <- matrix(NA, ngroup*(ngroup-1)/2, 3); pval <- matrix(NA, ngroup*(ngroup-1)/2, 1)
+  N.by <- Ndist.by <- Nclust.by <- nbins.by <- NULL   # save results
+  fit.sha <- se.sha <- nummat <- denom <- dots.fit <- list()
+  tstat <- matrix(NA, tot.num, 3); pval <- cval.cb <- matrix(NA, tot.num, 1)
   counter <- 1
-
+  data.plot <- list()   # data for plotting all comparisons
 
   ##################################################################
   ##################### ENTER the loop #############################
@@ -858,6 +921,7 @@ binspwc <- function(y, x, w=NULL,data=NULL, estmethod="reg", family=gaussian(),
         if (deriv == 0) pred.sha$fit <- linkinv(pred.sha$fit)
         if (deriv == 1) pred.sha$fit <- pred.sha.0 * pred.sha$fit
       } else {
+        basis.sha.0 <- basis.0
         basis.sha.1 <- basis.sha
         if (!is.null(eval.w)) {
           basis.sha.0 <- cbind(basis.0, outer(rep(1, nrow(basis.0)), eval.w))
@@ -889,9 +953,52 @@ binspwc <- function(y, x, w=NULL,data=NULL, estmethod="reg", family=gaussian(),
     nummat[[i]] <- basis.sha[,pos,drop=F] %*% Sigma.root
     denom[[i]]  <- sqrt(rowSums((basis.sha[, pos, drop=F] %*% vcv.sha) * basis.sha[, pos, drop=F]))
 
+    # prepare point estimates for plotting
+    if (plot & dotsngrid!=0) {
+      if (!is.null(bins.p) & !is.null(bins.s)) {
+        est.p <- bins.p; est.s <- bins.s
+        # since p and s for point estimates are different, run regression again
+        B    <- binsreg.spdes(eval=x.sub, p=est.p, s=est.s, knot=knot, deriv=0)
+        k    <- ncol(B)
+        P    <- cbind(B, w.sub)
+        if (estmethod=="reg") {
+          model <- lm(y.sub ~ P-1, weights=weights.sub)
+        } else if (estmethod=="qreg") {
+          model <- do.call(rq, c(list(formula=y.sub ~ P-1, tau=quantile, weights=weights.sub), estmethodopt))
+        } else if (estmethod=="glm") {
+          model <- do.call(glm, c(list(formula=y.sub ~ P-1, family=family, weights=weights.sub), estmethodopt))
+        }
+      } else {
+        est.p <- tsha.p; est.s <- tsha.s
+      }
+      basis.sha <- binsreg.spdes(eval=dots_grid, p=est.p, s=est.s, knot=knot, deriv=deriv)  # possibly based on a different grid
+
+      if (estmethod=="glm" & (!nolink)) {
+        pred.sha <- binsreg.pred(X=basis.sha, model=model, type="xb",
+                                 vce=vce, cluster=cluster.sub, deriv=deriv, wvec=eval.w, avar=asyvar)
+        if (deriv==0) dots.fit[[i]] <- linkinv(pred.sha$fit)
+        if (deriv==1) {
+          basis.0     <- binsreg.spdes(eval=dots_grid, p=est.p, s=est.s, knot=knot, deriv=0)
+          fit.0       <- binsreg.pred(basis.0, model, type = "xb", vce=vce, cluster=cluster.sub, deriv=0, wvec=eval.w)$fit
+          pred.sha.0  <- linkinv.1(fit.0)
+          dots.fit[[i]] <- pred.sha.0 * pred.sha$fit
+        }
+      } else {
+        if (estmethod=="qreg") {
+          dots.fit[[i]] <- binsreg.pred(basis.sha, model, type = "xb", vce=vce,
+                                    cluster=cluster.sub, deriv=deriv, wvec=eval.w,
+                                    is.qreg=TRUE, avar=asyvar, ...)$fit
+        } else {
+          dots.fit[[i]] <- binsreg.pred(basis.sha, model, type = "xb", vce=vce,
+                                    cluster=cluster.sub, deriv=deriv, wvec=eval.w, avar=asyvar)$fit
+        }
+      }
+    }
+
     # second loop over 1:(i-1)
     if (i>1) {
       for (j in 1:(i-1)) {
+        # tests
         if (testtype=="left") {
           tstat[counter,] <- c(max((fit.sha[[i]]-fit.sha[[j]]) / sqrt(se.sha[[i]]^2+se.sha[[j]]^2)), i, j)
         } else if (testtype=="right") {
@@ -904,10 +1011,68 @@ binspwc <- function(y, x, w=NULL,data=NULL, estmethod="reg", family=gaussian(),
           }
         }
 
-        pval[counter,1] <- binspwc.pval(nummat[[i]], nummat[[j]], denom[[i]], denom[[j]], nsims, tstat=tstat[counter,1], testtype=testtype, lp=lp)
+        binspwc.simul <- binspwc.pval(nummat[[i]], nummat[[j]], denom[[i]], denom[[j]], nsims, tstat=tstat[counter,1], testtype=testtype, lp=lp, alpha=level)
+        pval[counter,1] <- binspwc.simul$pval
+        cval.cb[counter,1] <- binspwc.simul$cval.cb
+
+        # plot
+        if (plot) {
+          data.pwc <- list()
+          pair <- paste(byvals[i], "-", byvals[j], sep=" ")
+          if (dotsngrid!=0) {
+            diff.fit <- dots.fit[[i]] - dots.fit[[j]]
+            data.dots <- data.frame(pair=pair, x=dots_grid, diff.fit=diff.fit)
+          } else {
+            data.dots <- NULL
+          }
+
+          cb.fit <- fit.sha[[i]] - fit.sha[[j]]
+          cb.se  <- sqrt(se.sha[[i]]^2+se.sha[[j]]^2)
+          cb.l   <- cb.fit - cval.cb[counter,1]*cb.se
+          cb.r   <- cb.fit + cval.cb[counter,1]*cb.se
+          data.cb <- data.frame(pair=pair, x=uni_grid, cb.fit=cb.fit, cb.se=cb.se, cb.l=cb.l, cb.r=cb.r)
+          data.pwc$data.dots <- data.dots
+          data.pwc$data.cb   <- data.cb
+          data.plot[[counter]] <- data.pwc
+          names(data.plot)[counter] <- paste("Group", byvals[i], "-", "Group", byvals[j], sep=" ")
+        }
+
         counter <- counter+1
       }
     }
+  }
+
+  ##### Plotting #######################
+  binsplot <- NULL
+  if (plot) {
+    binsplot <- ggplot() + theme_bw()
+    xr.min <- yr.min <- -Inf; xr.max <- yr.max <- Inf
+    if (!is.null(plotxrange)) {
+      xr.min <- plotxrange[1]
+      if (length(plotxrange)==2) xr.max <- plotxrange[2]
+    }
+    if (!is.null(plotyrange)) {
+      yr.min <- plotyrange[1]
+      if (length(plotyrange)==2) yr.max <- plotyrange[2]
+    }
+
+    for (i in 1:tot.num) {
+      data.pwc <- data.plot[[i]]
+      # dots
+      if (dotsngrid!=0) {
+          index <- complete.cases(data.pwc$data.dots[c("x", "diff.fit")]) & (data.pwc$data.dots["x"]>=xr.min) & (data.pwc$data.dots["x"]<=xr.max) &
+                   (data.pwc$data.dots["diff.fit"]>=yr.min) & (data.pwc$data.dots["diff.fit"]<=yr.max)
+          binsplot <- binsplot + geom_point(data=data.pwc$data.dots[index,],
+                                            aes(x=x, y=diff.fit), shape=symbols[i], colour=colors[i], size=2, show.legend = T)
+      }
+      # cb
+      index <- (data.pwc$data.cb["x"]>=xr.min) & (data.pwc$data.cb["x"]<=xr.max) &
+               (((data.pwc$data.cb["cb.l"]>=yr.min) & (data.pwc$data.cb["cb.r"]<=yr.max)) | is.na(data.pwc$data.cb["cb.l"]))
+      binsplot <- binsplot + geom_ribbon(data=data.pwc$data.cb[index,], aes(x=x, ymin=cb.l, ymax=cb.r, fill=pair), alpha=0.2)
+    }
+    binsplot <- binsplot + scale_fill_manual(name="Group Difference", values = colors[1:tot.num],
+                                             guide=guide_legend(override.aes = list(colour=colors[1:tot.num], linetype=0, shape=symbols[1:tot.num])))
+    print(binsplot)
   }
 
 
@@ -915,6 +1080,7 @@ binspwc <- function(y, x, w=NULL,data=NULL, estmethod="reg", family=gaussian(),
   ########### Output ###################
   ######################################
   out <- list(tstat=tstat, pval=pval,
+              bins_plot=binsplot, data.plot=data.plot, cval.cb=cval.cb,
               imse.var.rot=imse.v.rot, imse.var.dpi=imse.v.dpi,
               imse.bsq.rot=imse.b.rot, imse.bsq.dpi=imse.b.dpi,
               opt=list(deriv=deriv,

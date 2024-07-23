@@ -1,8 +1,8 @@
 ################################################################################################
 #'@title  Data-Driven Binscatter Quantile Regression with Robust Inference Procedures and Plots
 #'@description \code{binsqreg} implements binscatter quantile regression with robust inference procedures and plots, following the
-#'             results in \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_AER.pdf}{Cattaneo, Crump, Farrell and Feng (2023a)} and
-#'             \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_NonlinearBinscatter.pdf}{Cattaneo, Crump, Farrell and Feng (2023b)}.
+#'             results in \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_AER.pdf}{Cattaneo, Crump, Farrell and Feng (2024a)} and
+#'             \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_NonlinearBinscatter.pdf}{Cattaneo, Crump, Farrell and Feng (2024b)}.
 #'             Binscatter provides a flexible way to describe the quantile relationship between two variables, after
 #'             possibly adjusting for other covariates, based on partitioning/binning of the independent variable of interest.
 #'             The main purpose of this function is to generate binned scatter plots with curve estimation with robust pointwise confidence intervals and
@@ -115,12 +115,12 @@
 #'                 evaluation points within each bin for approximating the supremum operator.
 #'                 Setting at least \code{simsgrid=50} is recommended to obtain the final results.
 #'@param  simsseed  seed for simulation.
-#'@param  vce Procedure to compute the variance-covariance matrix estimator (see \code{\link{summary.rq}} for more details). Options are
+#'@param  vce Procedure to compute the variance-covariance matrix estimator (see \code{\link[quantreg]{summary.rq}} for more details). Options are
 #'           \itemize{
 #'           \item \code{"iid"} which presumes that the errors are iid and computes an estimate of the asymptotic covariance matrix as in KB(1978).
 #'           \item \code{"nid"} which presumes local (in quantile) linearity of the the conditional quantile functions and computes a Huber sandwich estimate using a local estimate of the sparsity.
 #'           \item \code{"ker"} which uses a kernel estimate of the sandwich as proposed by Powell (1991).
-#'           \item \code{"boot"} which implements one of several possible bootstrapping alternatives for estimating standard errors including a variate of the wild bootstrap for clustered response. See \code{\link{boot.rq}} for further details.
+#'           \item \code{"boot"} which implements one of several possible bootstrapping alternatives for estimating standard errors including a variate of the wild bootstrap for clustered response. See \code{\link[quantreg]{boot.rq}} for further details.
 #'           }
 #'@param  cluster cluster ID. Used for compute cluster-robust standard errors.
 #'@param  asyvar  if true, the standard error of the nonparametric component is computed and the uncertainty related to control
@@ -130,7 +130,7 @@
 #'@param  dfcheck adjustments for minimum effective sample size checks, which take into account number of unique
 #'                values of \code{x} (i.e., number of mass points), number of clusters, and degrees of freedom of
 #'                the different statistical models considered. The default is \code{dfcheck=c(20, 30)}.
-#'                See \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_Stata.pdf}{Cattaneo, Crump, Farrell and Feng (2023c)} for more details.
+#'                See \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_Stata.pdf}{Cattaneo, Crump, Farrell and Feng (2024c)} for more details.
 #'@param  masspoints how mass points in \code{x} are handled. Available options:
 #'                   \itemize{
 #'                   \item \code{"on"} all mass point and degrees of freedom checks are implemented. Default.
@@ -145,8 +145,8 @@
 #'@param  subset  optional rule specifying a subset of observations to be used.
 #'@param  plotxrange a vector. \code{plotxrange=c(min, max)} specifies a range of the x-axis for plotting. Observations outside the range are dropped in the plot.
 #'@param  plotyrange a vector. \code{plotyrange=c(min, max)} specifies a range of the y-axis for plotting. Observations outside the range are dropped in the plot.
-#'@param  qregopt a list of optional arguments used by \code{\link{rq}}.
-#'@param  ...     optional arguments to control bootstrapping. See \code{\link{boot.rq}}.
+#'@param  qregopt a list of optional arguments used by \code{\link[quantreg]{rq}}.
+#'@param  ...     optional arguments to control bootstrapping. See \code{\link[quantreg]{boot.rq}}.
 #'@return \item{\code{bins_plot}}{A \code{ggplot} object for binscatter plot.}
 #'        \item{\code{data.plot}}{A list containing data for plotting. Each item is a sublist of data frames for each group. Each sublist may contain the following data frames:
 #'        \itemize{
@@ -191,11 +191,11 @@
 #' Yingjie Feng (maintainer), Tsinghua University, Beijing, China. \email{fengyingjiepku@gmail.com}.
 #'
 #'@references
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023a: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_AER.pdf}{On Binscatter}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2024a: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_AER.pdf}{On Binscatter}. American Economic Review 114(5): 1488-1514.
 #'
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023b: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_NonlinearBinscatter.pdf}{Nonlinear Binscatter Methods}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2024b: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_NonlinearBinscatter.pdf}{Nonlinear Binscatter Methods}. Working Paper.
 #'
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023c: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_Stata.pdf}{Binscatter Regressions}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2024c: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_Stata.pdf}{Binscatter Regressions}. Working Paper.
 #'
 #'@seealso \code{\link{binsregselect}}, \code{\link{binstest}}.
 #'
@@ -339,6 +339,7 @@ binsqreg <- function(y, x, w=NULL, data=NULL, at=NULL, quantile=0.5, deriv=0,
   if (is.logical(dots)) if (!dots) {
     dots <- NULL
     dotsgrid <- 0
+    dotsgridmean <- F
   }
   if (is.logical(line)) if (!line) line <- NULL
   if (is.logical(ci)) if (!ci) ci <- NULL
@@ -504,22 +505,22 @@ binsqreg <- function(y, x, w=NULL, data=NULL, at=NULL, quantile=0.5, deriv=0,
     print("p<s not allowed.")
     exit <- 1
   }
-  # if (dots[1] < deriv) {
-  #   print("p<deriv not allowed.")
-  #   exit <- 1
-  # }
-  # if (!is.null(line)) if (line[1] < deriv) {
-  #   print("p<deriv not allowed.")
-  #   exit <- 1
-  # }
-  # if (!is.null(ci)) if (ci[1] < deriv) {
-  #   print("p<deriv not allowed.")
-  #   exit <- 1
-  # }
-  # if (!is.null(cb)) if (cb[1] < deriv) {
-  #   print("p<deriv not allowed.")
-  #   exit <- 1
-  # }
+  if (!is.null(dots)) if (is.numeric(dots)) if (dots[1] < deriv) {
+    print("p<deriv not allowed.")
+    exit <- 1
+  }
+  if (!is.null(line)) if (is.numeric(line)) if (line[1] < deriv) {
+    print("p<deriv not allowed.")
+    exit <- 1
+  }
+  if (!is.null(ci)) if (is.numeric(ci)) if (ci[1] < deriv) {
+    print("p<deriv not allowed.")
+    exit <- 1
+  }
+  if (!is.null(cb)) if (is.numeric(cb)) if (cb[1] < deriv) {
+    print("p<deriv not allowed.")
+    exit <- 1
+  }
   if (binsmethod!="dpi" & binsmethod!="rot") {
     print("bin selection method incorrectly specified.")
     exit <- 1

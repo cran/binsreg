@@ -3,8 +3,8 @@
 #'@description  Binscatter provides a flexible, yet parsimonious way of visualizing and summarizing large data sets
 #'              and has been a popular methodology in applied microeconomics and other social sciences. The binsreg package provides tools for
 #'              statistical analysis using the binscatter methods developed in
-#'              \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_AER.pdf}{Cattaneo, Crump, Farrell and Feng (2023a)} and
-#'              \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_NonlinearBinscatter.pdf}{Cattaneo, Crump, Farrell and Feng (2023b)}.
+#'              \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_AER.pdf}{Cattaneo, Crump, Farrell and Feng (2024a)} and
+#'              \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_NonlinearBinscatter.pdf}{Cattaneo, Crump, Farrell and Feng (2024b)}.
 #'              \code{\link{binsreg}} implements binscatter least squares regression with robust inference and plots, including
 #'              curve estimation, pointwise confidence intervals and uniform confidence band.
 #'              \code{\link{binsqreg}} implements binscatter quantile regression with robust inference and plots, including
@@ -13,14 +13,15 @@
 #'              curve estimation, pointwise confidence intervals and uniform confidence band.
 #'              \code{\link{binstest}} implements binscatter-based hypothesis testing procedures for parametric specifications
 #'              of and shape restrictions on the unknown function of interest.
-#'              \code{\link{binspwc}} implements hypothesis testing procedures for pairwise group comparison of binscatter estimators.
+#'              \code{\link{binspwc}} implements hypothesis testing procedures for pairwise group comparison of binscatter estimators and plots confidence
+#'              bands for the difference in binscatter parameters between each pair of groups.
 #'              \code{\link{binsregselect}} implements data-driven number of bins selectors for binscatter
 #'              implementation using either quantile-spaced or evenly-spaced binning/partitioning.
 #'              All the commands allow for covariate adjustment, smoothness restrictions, and clustering,
 #'              among other features.
 #'
 #'              The companion software article,
-#'              \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_Stata.pdf}{Cattaneo, Crump, Farrell and Feng (2023c)},
+#'              \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_Stata.pdf}{Cattaneo, Crump, Farrell and Feng (2024c)},
 #'              provides further implementation details and empirical illustration. For related Stata, R and Python packages
 #'              useful for nonparametric data analysis and statistical inference, visit
 #'              \href{https://nppackages.github.io/}{https://nppackages.github.io/}.
@@ -41,11 +42,11 @@
 #' Yingjie Feng (maintainer), Tsinghua University, Beijing, China. \email{fengyingjiepku@gmail.com}.
 #'
 #'@references
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023a: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_AER.pdf}{On Binscatter}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2024a: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_AER.pdf}{On Binscatter}. American Economic Review 114(5): 1488-1514.
 #'
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023b: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_NonlinearBinscatter.pdf}{Nonlinear Binscatter Methods}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2024b: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_NonlinearBinscatter.pdf}{Nonlinear Binscatter Methods}. Working Paper.
 #'
-#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2023c: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2023_Stata.pdf}{Binscatter Regressions}. Working Paper.
+#' Cattaneo, M. D., R. K. Crump, M. H. Farrell, and Y. Feng. 2024c: \href{https://nppackages.github.io/references/Cattaneo-Crump-Farrell-Feng_2024_Stata.pdf}{Binscatter Regressions}. Working Paper.
 #'
 #'@aliases binsreg-package
 "_PACKAGE"
