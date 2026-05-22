@@ -25,6 +25,21 @@ binsreg.bin.counts <- function(x, knot, nbins) {
   return(tabulate(bin, nbins=nbins))
 }
 
+binsreg.stata.irecode <- function(x, knot) {
+  if (length(knot) <= 2L) return(rep.int(1L, length(x)))
+
+  # Stata's binsreg_irecode passes cutpoints to irecode() through local macro
+  # expansion.  On normalized selector knots this matches %18.0g: 16 decimals.
+  cuts <- as.numeric(sprintf("%.16f", knot[-c(1L, length(knot))]))
+  pos <- findInterval(x, cuts, left.open=TRUE) + 1L
+  pmax.int(1L, pmin.int(length(knot)-1L, pos))
+}
+
+binsreg.which.min <- function(x) {
+  if (all(is.na(x))) return(1L)
+  which.min(x)
+}
+
 # grid generation
 binsreg.grid <- function(knot, ngrid, addmore=F) {
   eval <- cumsum(c(knot[1], rep(diff(knot)/(ngrid+1), each=ngrid+1)))
@@ -43,29 +58,258 @@ binsreg.grid <- function(knot, ngrid, addmore=F) {
 }
 
 # Generate Design
-binsreg.spdes <- function(eval, p, s, knot, deriv) {
-  if (s == 0) {
-     # mimic STATA irecode
-     pos <- findInterval(eval, knot, rightmost.closed = T, left.open = T)
-     n <- length(eval)
-     jmax <- p + 1L
-     P <- matrix(0, n, (length(knot)-1L) * jmax)
-     h <- diff(knot)
-     eval.cen <- (eval-knot[-length(knot)][pos]) / h[pos]
-     col.base <- (pos - 1L) * jmax
-     for (j in (deriv+1L):jmax) {
-       P[cbind(seq_len(n), col.base+j)] <- eval.cen^(j-1L-deriv) *
-         factorial(j-1L) / factorial(j-1L-deriv) / h[pos]^deriv
-     }
+binsreg.spdes <- function(eval, p, s, knot, deriv, pos=NULL) {
+  n <- length(eval)
+  k <- length(knot)
+  if (is.null(pos)) {
+    pos <- findInterval(eval, knot, rightmost.closed = T, left.open = T)
   } else {
-    if (length(knot) >= 3) {
-       ext.knot <- c(rep(knot[1], p+1), rep(knot[2:(length(knot)-1)], each = p-s+1), rep(knot[length(knot)], p+1))
-    } else {
-       ext.knot <- c(rep(knot[1], p+1), rep(knot[length(knot)], p+1))
+    pos <- as.integer(pos)
+  }
+
+  if (p == 0 && s == 0) {
+    P <- matrix(0, n, k-1L)
+    if (deriv == 0 && n > 0) {
+      idx <- seq_len(n)
+      P[idx + (pos - 1L)*n] <- 1
     }
-    P <- splineDesign(knots = ext.knot, eval, ord = p+1, derivs = deriv)
+    return(P)
+  }
+
+  if (p == 1 && (s == 0 || s == 1) && (deriv == 0 || deriv == 1)) {
+    width <- p - s + 1L
+    P <- matrix(0, n, (k-2L)*width + p + 1L)
+    if (n > 0) {
+      h <- knot[pos+1L] - knot[pos]
+      w <- (eval - knot[pos]) / h
+      if (deriv == 0) {
+        left <- 1-w
+        right <- w
+      } else {
+        left <- -1/h
+        right <- 1/h
+      }
+      col.base <- if (s == 1) pos else 2L*pos - 1L
+      idx <- seq_len(n)
+      P[idx + (col.base - 1L)*n] <- left
+      P[idx + col.base*n] <- right
+    }
+    return(P)
+  }
+
+  if (p == 2 && s == 2 && deriv %in% 0:2) {
+    P <- matrix(0, n, k+1L)
+    if (n > 0) {
+      ext.knot <- if (k >= 3L) {
+        c(rep(knot[1L], 3L), knot[2L:(k-1L)], rep(knot[k], 3L))
+      } else {
+        c(rep(knot[1L], 3L), rep(knot[k], 3L))
+      }
+      ind.lk <- pos + 2L
+      lk1 <- ext.knot[ind.lk-1L]
+      lk2 <- ext.knot[ind.lk]
+      rk1 <- ext.knot[ind.lk+1L]
+      rk2 <- ext.knot[ind.lk+2L]
+
+      first.w <- (eval - lk2) / (rk1 - lk2)
+      b.left <- 1 - first.w
+      b.right <- first.w
+      w.left <- 1 / (rk1 - lk1)
+      w.right <- 1 / (rk2 - lk2)
+
+      if (deriv == 0) {
+        w.left.x <- (eval - lk1) * w.left
+        w.right.x <- (eval - lk2) * w.right
+        vals1 <- (1 - w.left.x) * b.left
+        vals2 <- (1 - w.right.x) * b.right + w.left.x * b.left
+        vals3 <- w.right.x * b.right
+      } else if (deriv == 1) {
+        vals1 <- -2 * w.left * b.left
+        vals2 <- 2 * (w.left * b.left - w.right * b.right)
+        vals3 <- 2 * w.right * b.right
+      } else {
+        first.deriv <- 1 / (rk1 - lk2)
+        vals1 <- 2 * w.left * first.deriv
+        vals2 <- -2 * first.deriv * (w.left + w.right)
+        vals3 <- 2 * w.right * first.deriv
+      }
+
+      idx <- seq_len(n)
+      P[idx + (pos - 1L)*n] <- vals1
+      P[idx + pos*n] <- vals2
+      P[idx + (pos + 1L)*n] <- vals3
+    }
+    return(P)
+  }
+
+  if (p == 3 && s == 3 && deriv %in% c(0, 3)) {
+    P <- matrix(0, n, k+2L)
+    if (n > 0) {
+      ext.knot <- if (k >= 3L) {
+        c(rep(knot[1L], 4L), knot[2L:(k-1L)], rep(knot[k], 4L))
+      } else {
+        c(rep(knot[1L], 4L), rep(knot[k], 4L))
+      }
+      ind.lk <- pos + 3L
+      lk1 <- ext.knot[ind.lk-2L]
+      lk2 <- ext.knot[ind.lk-1L]
+      lk3 <- ext.knot[ind.lk]
+      rk1 <- ext.knot[ind.lk+1L]
+      rk2 <- ext.knot[ind.lk+2L]
+      rk3 <- ext.knot[ind.lk+3L]
+
+      if (deriv == 0) {
+        w1 <- (eval - lk3) / (rk1 - lk3)
+        b0 <- 1 - w1
+        b1 <- w1
+
+        w20 <- (eval - lk2) / (rk1 - lk2)
+        w21 <- (eval - lk3) / (rk2 - lk3)
+        b20 <- (1 - w20) * b0
+        b21 <- (1 - w21) * b1 + w20 * b0
+        b22 <- w21 * b1
+
+        w30 <- (eval - lk1) / (rk1 - lk1)
+        w31 <- (eval - lk2) / (rk2 - lk2)
+        w32 <- (eval - lk3) / (rk3 - lk3)
+        vals1 <- (1 - w30) * b20
+        vals2 <- (1 - w31) * b21 + w30 * b20
+        vals3 <- (1 - w32) * b22 + w31 * b21
+        vals4 <- w32 * b22
+      } else {
+        w1 <- 1 / (rk1 - lk3)
+        b0 <- -w1
+        b1 <- w1
+
+        w20 <- 1 / (rk1 - lk2)
+        w21 <- 1 / (rk2 - lk3)
+        u0 <- w20 * b0
+        u1 <- w21 * b1
+        b20 <- -2 * u0
+        b21 <- 2 * (u0 - u1)
+        b22 <- 2 * u1
+
+        w30 <- 1 / (rk1 - lk1)
+        w31 <- 1 / (rk2 - lk2)
+        w32 <- 1 / (rk3 - lk3)
+        u0 <- w30 * b20
+        u1 <- w31 * b21
+        u2 <- w32 * b22
+        vals1 <- -3 * u0
+        vals2 <- 3 * (u0 - u1)
+        vals3 <- 3 * (u1 - u2)
+        vals4 <- 3 * u2
+      }
+
+      idx <- seq_len(n)
+      P[idx + (pos - 1L)*n] <- vals1
+      P[idx + pos*n] <- vals2
+      P[idx + (pos + 1L)*n] <- vals3
+      P[idx + (pos + 2L)*n] <- vals4
+    }
+    return(P)
+  }
+
+  width <- p - s + 1L
+  if (k >= 3L) {
+    ext.knot <- c(rep(knot[1L], p+1L), rep(knot[2L:(k-1L)], each=width), rep(knot[k], p+1L))
+  } else {
+    ext.knot <- c(rep(knot[1L], p+1L), rep(knot[k], p+1L))
+  }
+
+  ind.lk <- p + 1L + (pos - 1L)*width
+  lk <- rk <- matrix(NA_real_, n, p)
+  if (p > 0 && n > 0) {
+    for (i in seq_len(p)) {
+      lk[, p-i+1L] <- ext.knot[ind.lk-i+1L]
+      rk[, i] <- ext.knot[ind.lk+i]
+    }
+  }
+
+  bs <- matrix(1, n, 1L)
+  zero <- matrix(0, n, 1L)
+  if (p >= 1L) {
+    if (p < deriv) {
+      bs <- matrix(0, n, p+1L)
+    } else if (p > deriv) {
+      for (i in seq_len(p-deriv)) {
+        tl <- lk[, (p-i+1L):p, drop=FALSE]
+        tr <- rk[, seq_len(i), drop=FALSE]
+        w <- (eval - tl) / (tr - tl)
+        bs <- cbind((1-w)*bs, zero) + cbind(zero, w*bs)
+      }
+      if (deriv > 0) {
+        for (i in (p-deriv+1L):p) {
+          tl <- lk[, (p-i+1L):p, drop=FALSE]
+          tr <- rk[, seq_len(i), drop=FALSE]
+          w <- 1 / (tr - tl)
+          bs <- (cbind(zero, w*bs) - cbind(w*bs, zero)) * i
+        }
+      }
+    } else {
+      for (i in seq_len(p)) {
+        tl <- lk[, (p-i+1L):p, drop=FALSE]
+        tr <- rk[, seq_len(i), drop=FALSE]
+        w <- 1 / (tr - tl)
+        bs <- (cbind(zero, w*bs) - cbind(w*bs, zero)) * i
+      }
+    }
+  }
+
+  P <- matrix(0, n, (k-2L)*width + p + 1L)
+  if (n > 0) {
+    col.base <- (pos - 1L)*width + 1L
+    idx <- seq_len(n)
+    for (j in 0:p) {
+      P[idx + (col.base + j - 1L)*n] <- bs[, j+1L]
+    }
   }
   return(P)
+}
+
+binsreg.spdes.p3d3.fit <- function(eval, knot, pos, beta) {
+  n <- length(eval)
+  k <- length(knot)
+  if (n == 0L) return(numeric(0L))
+  pos <- as.integer(pos)
+  ext.knot <- if (k >= 3L) {
+    c(rep(knot[1L], 4L), knot[2L:(k-1L)], rep(knot[k], 4L))
+  } else {
+    c(rep(knot[1L], 4L), rep(knot[k], 4L))
+  }
+  ind.lk <- pos + 3L
+  lk1 <- ext.knot[ind.lk-2L]
+  lk2 <- ext.knot[ind.lk-1L]
+  lk3 <- ext.knot[ind.lk]
+  rk1 <- ext.knot[ind.lk+1L]
+  rk2 <- ext.knot[ind.lk+2L]
+  rk3 <- ext.knot[ind.lk+3L]
+
+  w1 <- 1 / (rk1 - lk3)
+  b0 <- -w1
+  b1 <- w1
+
+  w20 <- 1 / (rk1 - lk2)
+  w21 <- 1 / (rk2 - lk3)
+  u0 <- w20 * b0
+  u1 <- w21 * b1
+  b20 <- -2 * u0
+  b21 <- 2 * (u0 - u1)
+  b22 <- 2 * u1
+
+  w30 <- 1 / (rk1 - lk1)
+  w31 <- 1 / (rk2 - lk2)
+  w32 <- 1 / (rk3 - lk3)
+  u0 <- w30 * b20
+  u1 <- w31 * b21
+  u2 <- w32 * b22
+  vals1 <- -3 * u0
+  vals2 <- 3 * (u0 - u1)
+  vals3 <- 3 * (u1 - u2)
+  vals4 <- 3 * u2
+
+  vals1 * beta[pos] + vals2 * beta[pos + 1L] +
+    vals3 * beta[pos + 2L] + vals4 * beta[pos + 3L]
 }
 
 # check drop, display warning
@@ -109,22 +353,322 @@ binsreg.rq.complete <- function(model) {
 }
 
 # wrapper of vcov and vcovCL
+binsreg.lm.normal.eq.cond.max <- 1e6
+
+binsreg.lm.xtx.ok <- function(XtX) {
+  rc <- tryCatch(rcond(XtX), error=function(e) 0)
+  is.finite(rc) && rc > 1 / binsreg.lm.normal.eq.cond.max
+}
+
+binsreg.vcov.fast.lm.supports <- function(type, cluster) {
+  if (is.null(type)) return(TRUE)
+  if (is.null(cluster)) return(type %in% c("const", "HC1", "HC2", "HC3"))
+  return(type == "HC1")
+}
+
+binsreg.vcov.fast.lm <- function(model, type, cluster) {
+  if (inherits(model, "glm")) return(NULL)
+  if (is.null(model$x)) return(NULL)
+  if (!(type %in% c("const", "HC1", "HC2", "HC3"))) return(NULL)
+  if (!is.null(cluster) && type != "HC1") return(NULL)
+
+  X <- model$x
+  rank <- model$rank
+  coefficients <- model$coefficients
+  nonalias <- !is.na(coefficients)
+  if (sum(nonalias) != rank) return(NULL)
+  if (type == "const" && rank != ncol(X)) return(NULL)
+  df.resid <- model$df.residual
+  if (is.null(df.resid) || is.na(df.resid) || df.resid <= 0) return(NULL)
+
+  if (!is.null(model$binsreg.xtx)) {
+    if (rank != ncol(X)) return(NULL)
+    XtX.inv <- model$binsreg.xtx.inv
+    if (is.null(XtX.inv)) XtX.inv <- tryCatch(solve(model$binsreg.xtx), error=function(e) NULL)
+    if (is.null(XtX.inv)) return(NULL)
+    X.vcov <- X
+  } else {
+    R <- qr.R(model$qr)[seq_len(rank), seq_len(rank), drop=FALSE]
+    XtX.inv.pivot <- tryCatch(chol2inv(R), error=function(e) NULL)
+    if (is.null(XtX.inv.pivot)) return(NULL)
+
+    XtX.inv.full <- matrix(0, ncol(X), ncol(X))
+    pivot <- model$qr$pivot[seq_len(rank)]
+    XtX.inv.full[pivot, pivot] <- XtX.inv.pivot
+    if (rank == ncol(X)) {
+      XtX.inv <- XtX.inv.full
+      X.vcov <- X
+    } else {
+      XtX.inv <- XtX.inv.full[nonalias, nonalias, drop=FALSE]
+      X.vcov <- X[, nonalias, drop=FALSE]
+    }
+  }
+
+  resid <- as.vector(model$residuals)
+  weights <- model$weights
+  if (is.null(weights)) weights <- rep.int(1, length(resid))
+  if (type == "const") {
+    return(XtX.inv * sum(weights * resid^2) / df.resid)
+  }
+
+  if (is.null(cluster)) {
+    scale <- weights^2 * resid^2
+    if (type == "HC1") {
+      scale <- scale * length(resid) / df.resid
+    } else if (type %in% c("HC2", "HC3")) {
+      leverage <- weights * rowSums((X.vcov %*% XtX.inv) * X.vcov)
+      leverage <- pmin(leverage, 1 - .Machine$double.eps)
+      scale <- scale / (1 - leverage)
+      if (type == "HC3") scale <- scale / (1 - leverage)
+    }
+    X.scaled <- X.vcov * sqrt(scale)
+    return(XtX.inv %*% crossprod(X.scaled) %*% XtX.inv)
+  }
+
+  cluster <- as.data.frame(cluster)
+  if (ncol(cluster) != 1L || nrow(cluster) != length(resid) || anyNA(cluster)) return(NULL)
+  cluster <- cluster[[1L]]
+  G <- if (is.factor(cluster)) length(levels(cluster)) else length(unique(cluster))
+  if (G <= 1L) return(NULL)
+
+  estfun <- X.vcov * (weights * resid)
+  score <- rowsum(estfun, group=cluster, reorder=FALSE)
+  scale <- (G / (G - 1L)) * ((length(resid) - 1L) / df.resid)
+  return(XtX.inv %*% crossprod(score) %*% XtX.inv * scale)
+}
+
+binsreg.vcov.fast.glm <- function(model, type, cluster) {
+  if (!inherits(model, "glm")) return(NULL)
+  if (is.null(model$x) || is.null(model$qr)) return(NULL)
+  if (is.null(type) || type != "HC1") return(NULL)
+  if (!(substr(model$family$family, 1L, 17L) %in% c("poisson", "binomial", "Negative Binomial"))) {
+    return(NULL)
+  }
+
+  X <- model$x
+  rank <- model$rank
+  coefficients <- model$coefficients
+  nonalias <- !is.na(coefficients)
+  if (sum(nonalias) != rank) return(NULL)
+  df.resid <- model$df.residual
+  if (is.null(df.resid) || is.na(df.resid) || df.resid <= 0) return(NULL)
+
+  R <- qr.R(model$qr)[seq_len(rank), seq_len(rank), drop=FALSE]
+  XtWX.inv.pivot <- tryCatch(chol2inv(R), error=function(e) NULL)
+  if (is.null(XtWX.inv.pivot)) return(NULL)
+  pivot <- model$qr$pivot[seq_len(rank)]
+  nonalias.idx <- which(nonalias)
+  pivot.order <- match(pivot, nonalias.idx)
+  if (anyNA(pivot.order)) return(NULL)
+  XtWX.inv <- matrix(0, rank, rank)
+  XtWX.inv[pivot.order, pivot.order] <- XtWX.inv.pivot
+  dimnames(XtWX.inv) <- list(names(coefficients)[nonalias], names(coefficients)[nonalias])
+
+  wres <- as.vector(model$residuals) * model$weights
+  estfun <- X[, nonalias, drop=FALSE] * wres
+  n <- length(wres)
+  if (is.null(cluster)) {
+    scale <- n / df.resid
+    return(XtWX.inv %*% crossprod(estfun) %*% XtWX.inv * scale)
+  }
+
+  cluster <- as.data.frame(cluster)
+  if (ncol(cluster) != 1L || nrow(cluster) != n || anyNA(cluster)) return(NULL)
+  cluster <- cluster[[1L]]
+  G <- if (is.factor(cluster)) length(levels(cluster)) else length(unique(cluster))
+  if (G <= 1L) return(NULL)
+
+  score <- rowsum(estfun, group=cluster, reorder=FALSE)
+  scale <- (G / (G - 1L)) * ((n - 1L) / df.resid)
+  return(XtWX.inv %*% crossprod(score) %*% XtWX.inv * scale)
+}
+
 binsreg.vcov <- function(model, type, cluster, is.qreg=FALSE, ...) {
   if (is.qreg) {
     model <- binsreg.rq.complete(model)
     V <- summary.rq(model, se=type, covariance = TRUE, cluster=cluster, ...)$cov
   } else {
-    if (type=="const") {
-      V <- vcov(model)
-    } else {
-      V <- vcovCL(model, type=type, cluster=cluster)
+    if (!is.null(model$binsreg.vcov) &&
+        identical(model$binsreg.vcov.type, type) &&
+        identical(model$binsreg.vcov.has.cluster, !is.null(cluster))) {
+      return(model$binsreg.vcov)
+    }
+    V <- binsreg.vcov.fast.glm(model, type=type, cluster=cluster)
+    if (is.null(V)) V <- binsreg.vcov.fast.lm(model, type=type, cluster=cluster)
+    if (is.null(V)) {
+      if (type=="const") {
+        V <- vcov(model)
+      } else {
+        V <- vcovCL(model, type=type, cluster=cluster)
+      }
     }
   }
   return(V)
 }
 
+binsreg.lm.block.supports <- function(type, cluster) {
+  if (!is.null(cluster)) return(!is.null(type) && type == "HC1")
+  return(is.null(type) || type %in% c("const", "HC1"))
+}
+
+binsreg.block.crossprod <- function(B, w) {
+  Bw <- crossprod(B, w)
+  rbind(cbind(crossprod(B), Bw), cbind(t(Bw), crossprod(w)))
+}
+
+binsreg.fit.lm.design <- function(y, B, w=NULL, weights=NULL, vcov.type=NULL, cluster=NULL) {
+  if (is.null(w) || length(w)==0) {
+    return(binsreg.fit.lm(y, B, weights=weights, vcov.type=vcov.type, cluster=cluster))
+  }
+  if (!binsreg.lm.block.supports(vcov.type, cluster)) {
+    return(binsreg.fit.lm(y, binsreg.cbind(B, w), weights=weights, vcov.type=vcov.type, cluster=cluster))
+  }
+
+  y.vec <- as.vector(y)
+  B <- as.matrix(B)
+  w <- as.matrix(w)
+  n <- length(y.vec)
+  k.b <- ncol(B)
+  k.w <- ncol(w)
+  k <- k.b + k.w
+  if (nrow(B) != n || nrow(w) != n || n < k || k <= 0L) {
+    return(binsreg.fit.lm(y, binsreg.cbind(B, w), weights=weights, vcov.type=vcov.type, cluster=cluster))
+  }
+  if (k.w <= 4L) {
+    return(binsreg.fit.lm(y, binsreg.cbind(B, w), weights=weights, vcov.type=vcov.type, cluster=cluster))
+  }
+
+  if (is.null(weights)) {
+    fit.B <- B
+    fit.w <- w
+    fit.y <- y.vec
+  } else {
+    sqrt.weights <- sqrt(weights)
+    fit.B <- B * sqrt.weights
+    fit.w <- w * sqrt.weights
+    fit.y <- y.vec * sqrt.weights
+  }
+
+  XtX <- binsreg.block.crossprod(fit.B, fit.w)
+  if (!binsreg.lm.xtx.ok(XtX)) {
+    return(binsreg.fit.lm(y, binsreg.cbind(B, w), weights=weights, vcov.type=vcov.type, cluster=cluster))
+  }
+
+  Xty <- c(crossprod(fit.B, fit.y), crossprod(fit.w, fit.y))
+  XtX.inv <- tryCatch(solve(XtX), error=function(e) NULL)
+  if (is.null(XtX.inv)) {
+    return(binsreg.fit.lm(y, binsreg.cbind(B, w), weights=weights, vcov.type=vcov.type, cluster=cluster))
+  }
+  beta <- XtX.inv %*% Xty
+  beta <- as.vector(beta)
+  coef.names <- c(colnames(B), colnames(w))
+  if (length(coef.names)==length(beta) && any(nzchar(coef.names))) names(beta) <- coef.names
+
+  fitted <- as.vector(B %*% beta[seq_len(k.b)] + w %*% beta[k.b + seq_len(k.w)])
+  resid <- y.vec - fitted
+  model <- list(
+    coefficients = beta,
+    residuals = resid,
+    fitted.values = fitted,
+    rank = k,
+    df.residual = n - k,
+    y = y.vec,
+    binsreg.xtx = XtX,
+    binsreg.xtx.inv = XtX.inv
+  )
+  if (!is.null(weights)) model$weights <- weights
+  model$terms <- terms(y ~ -1 + P)
+  model$call <- match.call()
+  class(model) <- "lm"
+
+  if (!is.null(vcov.type) || !is.null(cluster)) {
+    df.resid <- model$df.residual
+    if (is.null(cluster)) {
+      if (vcov.type == "const") {
+        V <- XtX.inv * sum(if (is.null(weights)) resid^2 else weights * resid^2) / df.resid
+      } else {
+        wt <- if (is.null(weights)) 1 else weights
+        scale <- wt^2 * resid^2
+        if (vcov.type == "HC1") scale <- scale * n / df.resid
+        sqrt.scale <- sqrt(scale)
+        meat <- binsreg.block.crossprod(B * sqrt.scale, w * sqrt.scale)
+        V <- XtX.inv %*% meat %*% XtX.inv
+      }
+    } else {
+      cluster.data <- as.data.frame(cluster)
+      if (ncol(cluster.data) != 1L || nrow(cluster.data) != n || anyNA(cluster.data)) {
+        return(binsreg.fit.lm(y, binsreg.cbind(B, w), weights=weights, vcov.type=vcov.type, cluster=cluster))
+      }
+      cluster.vec <- cluster.data[[1L]]
+      G <- if (is.factor(cluster.vec)) length(levels(cluster.vec)) else length(unique(cluster.vec))
+      if (G <= 1L) {
+        return(binsreg.fit.lm(y, binsreg.cbind(B, w), weights=weights, vcov.type=vcov.type, cluster=cluster))
+      }
+      wt.resid <- if (is.null(weights)) resid else weights * resid
+      score <- cbind(rowsum(B * wt.resid, group=cluster.vec, reorder=FALSE),
+                     rowsum(w * wt.resid, group=cluster.vec, reorder=FALSE))
+      V <- XtX.inv %*% crossprod(score) %*% XtX.inv *
+        (G / (G - 1L)) * ((n - 1L) / df.resid)
+    }
+    model$binsreg.vcov <- V
+    model$binsreg.vcov.type <- vcov.type
+    model$binsreg.vcov.has.cluster <- !is.null(cluster)
+  }
+
+  return(model)
+}
+
 # faster internal lm/glm fitters for already-built numeric design matrices
-binsreg.fit.lm <- function(y, P, weights=NULL) {
+binsreg.fit.lm <- function(y, P, weights=NULL, vcov.type=NULL, cluster=NULL) {
+  if (binsreg.vcov.fast.lm.supports(vcov.type, cluster)) {
+    y.vec <- as.vector(y)
+    n <- length(y.vec)
+    k <- ncol(P)
+    if (n >= k && k > 0L) {
+      if (is.null(weights)) {
+        fit.x <- P
+        fit.y <- y.vec
+      } else {
+        sqrt.weights <- sqrt(weights)
+        fit.x <- P * sqrt.weights
+        fit.y <- y.vec * sqrt.weights
+      }
+      XtX <- crossprod(fit.x)
+      if (binsreg.lm.xtx.ok(XtX)) {
+        Xty <- crossprod(fit.x, fit.y)
+        need.vcov <- !is.null(vcov.type) || !is.null(cluster)
+        XtX.inv <- NULL
+        if (need.vcov) {
+          XtX.inv <- tryCatch(solve(XtX), error=function(e) NULL)
+          beta <- if (is.null(XtX.inv)) NULL else XtX.inv %*% Xty
+        } else {
+          beta <- tryCatch(solve(XtX, Xty), error=function(e) NULL)
+        }
+        if (!is.null(beta)) {
+          beta <- as.vector(beta)
+          names(beta) <- colnames(P)
+          fitted <- as.vector(P %*% beta)
+          model <- list(
+            coefficients = beta,
+            residuals = y.vec - fitted,
+            fitted.values = fitted,
+            rank = k,
+            df.residual = n - k,
+            x = P,
+            y = y.vec,
+            binsreg.xtx = XtX
+          )
+          if (!is.null(XtX.inv)) model$binsreg.xtx.inv <- XtX.inv
+          if (!is.null(weights)) model$weights <- weights
+          model$terms <- terms(y ~ -1 + P)
+          model$call <- match.call()
+          class(model) <- "lm"
+          return(model)
+        }
+      }
+    }
+  }
+
   if (is.null(weights)) {
     model <- lm.fit(x=P, y=y)
   } else {
@@ -139,6 +683,41 @@ binsreg.fit.lm <- function(y, P, weights=NULL) {
   return(model)
 }
 
+binsreg.fit.lm.slim <- function(y, B, w=NULL, weights=NULL, fitted=FALSE) {
+  P <- if (is.null(w) || length(w)==0) B else binsreg.cbind(B, w)
+  y.vec <- as.vector(y)
+  P <- as.matrix(P)
+  n <- length(y.vec)
+  k <- ncol(P)
+  if (n >= k && k > 0L) {
+    if (is.null(weights)) {
+      fit.x <- P
+      fit.y <- y.vec
+    } else {
+      sqrt.weights <- sqrt(weights)
+      fit.x <- P * sqrt.weights
+      fit.y <- y.vec * sqrt.weights
+    }
+    XtX <- crossprod(fit.x)
+    if (binsreg.lm.xtx.ok(XtX)) {
+      beta <- tryCatch(solve(XtX, crossprod(fit.x, fit.y)), error=function(e) NULL)
+      if (!is.null(beta)) {
+        beta <- as.vector(beta)
+        names(beta) <- colnames(P)
+        if (fitted) {
+          return(list(coefficients=beta, fitted.values=as.vector(P %*% beta)))
+        }
+        return(list(coefficients=beta))
+      }
+    }
+  }
+  model <- binsreg.fit.lm(y, P, weights=weights)
+  if (fitted) {
+    return(list(coefficients=model$coefficients, fitted.values=model$fitted.values))
+  }
+  return(list(coefficients=model$coefficients))
+}
+
 binsreg.fit.glm <- function(y, P, family, weights=NULL, ...) {
   dots <- list(...)
   dot.names <- names(dots)
@@ -146,15 +725,13 @@ binsreg.fit.glm <- function(y, P, family, weights=NULL, ...) {
   if (length(dots) && (is.null(dot.names) || any(dot.names == "") || any(!dot.names %in% allowed))) {
     return(glm(y ~ P - 1, family=family, weights=weights, ...))
   }
-  model <- do.call(glm.fit, c(list(x=P, y=y, weights=weights, family=family), dots))
-  model$terms <- terms(y ~ -1 + P)
-  model$call <- match.call()
+  if (length(dots)) {
+    model <- do.call(glm.fit, c(list(x=P, y=y, weights=weights, family=family), dots))
+  } else {
+    model <- glm.fit(x=P, y=y, weights=weights, family=family)
+  }
   model$x <- P
   model$y <- y
-  model$prior.weights <- if (is.null(weights)) rep.int(1, length(y)) else weights
-  model$contrasts <- NULL
-  model$xlevels <- list()
-  model$formula <- y ~ -1 + P
   class(model) <- c("glm", "lm")
   return(model)
 }
@@ -316,6 +893,14 @@ binsreg.pval <- function(num, denom, rep, tstat=NULL, side=NULL, alpha, lp=Inf) 
   if (!is.null(tstat)) pval <- numeric(nrow(tstat))
   cval <- NA
   k <- ncol(num)
+  need.max <- !is.null(side) && side == "left"
+  need.min <- !is.null(side) && side == "right"
+  need.abs <- !is.null(side) && side == "two"
+  if (!is.null(tstat)) {
+    need.max <- need.max || any(tstat[, 2] == 1)
+    need.min <- need.min || any(tstat[, 2] == 2)
+    need.abs <- need.abs || any(tstat[, 2] == 3)
+  }
 
   chunk.size <- min(rep, max(1L, floor(5e6 / max(1L, nrow(num)))))
   start <- 1L
@@ -324,12 +909,14 @@ binsreg.pval <- function(num, denom, rep, tstat=NULL, side=NULL, alpha, lp=Inf) 
     eps <- matrix(rnorm(k * chunk, 0, 1), nrow = k)
     tx <- (num %*% eps) / denom
 
-    max.tx <- matrixStats::colMaxs(tx)
-    min.tx <- matrixStats::colMins(tx)
-    abs.tx <- if (is.infinite(lp)) {
-      matrixStats::colMaxs(abs(tx))
-    } else {
-      colMeans(abs(tx)^lp)^(1/lp)
+    if (need.max) max.tx <- matrixStats::colMaxs(tx)
+    if (need.min) min.tx <- matrixStats::colMins(tx)
+    if (need.abs) {
+      abs.tx <- if (is.infinite(lp)) {
+        matrixStats::colMaxs(abs(tx))
+      } else {
+        colMeans(abs(tx)^lp)^(1/lp)
+      }
     }
 
     if (!is.null(side)) {
@@ -375,6 +962,9 @@ binspwc.pval <- function(nummat1, nummat2, denom1, denom2, rep, tstat=NULL, test
   tvec <- numeric(rep)
   k1 <- ncol(nummat1); k2 <- ncol(nummat2)
   denom <- sqrt(denom1^2+denom2^2)
+  need.max <- testtype == "left"
+  need.min <- testtype == "right"
+  need.test.abs <- !(need.max || need.min)
 
   chunk.size <- min(rep, max(1L, floor(5e6 / max(1L, nrow(nummat1)))))
   start <- 1L
@@ -385,12 +975,16 @@ binspwc.pval <- function(nummat1, nummat2, denom1, denom2, rep, tstat=NULL, test
     eps2 <- eps[k1 + seq_len(k2), , drop=F]
     tx <- (nummat1 %*% eps1 - nummat2 %*% eps2) / denom
 
-    max.tx <- matrixStats::colMaxs(tx)
-    min.tx <- matrixStats::colMins(tx)
-    abs.tx <- if (is.infinite(lp)) {
-      matrixStats::colMaxs(abs(tx))
-    } else {
-      colMeans(abs(tx)^lp)^(1/lp)
+    if (need.max) max.tx <- matrixStats::colMaxs(tx)
+    if (need.min) min.tx <- matrixStats::colMins(tx)
+    abs.tx.matrix <- abs(tx)
+    abs.cb <- matrixStats::colMaxs(abs.tx.matrix)
+    if (need.test.abs) {
+      abs.tx <- if (is.infinite(lp)) {
+        abs.cb
+      } else {
+        colMeans(abs.tx.matrix^lp)^(1/lp)
+      }
     }
 
     if (testtype == "left") {
@@ -402,7 +996,7 @@ binspwc.pval <- function(nummat1, nummat2, denom1, denom2, rep, tstat=NULL, test
     }
 
     idx <- start:(start + chunk - 1L)
-    tvec[idx] <- matrixStats::colMaxs(abs(tx))
+    tvec[idx] <- abs.cb
     start <- start + chunk
   }
   pval <- pval / rep
@@ -479,19 +1073,25 @@ bernpoly <- function(x, p) {
 }
 
 # ROT selector
-binsregselect.rot <- function(y, x, w, p, s, deriv, es=F, eN, norotnorm=F, qrot=2, den.alpha=0.975, weights=NULL) {
-  x <- (x - min(x)) / (max(x) - min(x))
+binsregselect.rot <- function(y, x, w, p, s, deriv, es=F, eN, norotnorm=F, qrot=2, den.alpha=0.975, weights=NULL,
+                              x.norm=NULL) {
+  if (is.null(x.norm)) {
+    x <- (x - min(x)) / (max(x) - min(x))
+  } else {
+    x <- x.norm
+  }
   ord <- p+1
   N <- length(x)
 
-  x.p <- matrix(NA, N, p+qrot+1)
-  for (j in 1:(p+qrot+1))  x.p[,j] <- x^(j-1)
-  P <- binsreg.cbind(x.p, w)
-  est <- binsreg.fit.lm(y, P, weights=weights)
+  x.p <- matrix(1, N, p+qrot+1)
+  if (ncol(x.p) > 1L) {
+    for (j in 2:ncol(x.p)) x.p[,j] <- x.p[,j-1L] * x
+  }
+  est <- binsreg.fit.lm.slim(y, x.p, w, weights=weights, fitted=TRUE)
   beta <- est$coefficients; est <- est$fitted.values
 
   # variance constant
-  s2 <- binsreg.fit.lm(y^2, P, weights=weights)$fitted.values - est^2
+  s2 <- binsreg.fit.lm.slim(y^2, x.p, w, weights=weights, fitted=TRUE)$fitted.values - est^2
   if (norotnorm) {
     fz <- 1
   } else {
@@ -528,9 +1128,13 @@ binsregselect.rot <- function(y, x, w, p, s, deriv, es=F, eN, norotnorm=F, qrot=
 }
 
 # locate h
-binsreg.locate <- function(x, knot, type="all") {
+binsreg.locate <- function(x, knot, type="all", pos=NULL) {
   h <- tl <- NA
-  loc.ind <- findInterval(x, knot, rightmost.closed = T)
+  if (is.null(pos)) {
+    loc.ind <- findInterval(x, knot, rightmost.closed = T, left.open = T)
+  } else {
+    loc.ind <- as.integer(pos)
+  }
   if (type=="all"|type=="h") {
     size    <- diff(knot)
     h       <- size[loc.ind]
@@ -542,31 +1146,66 @@ binsreg.locate <- function(x, knot, type="all") {
   return(list(h=h, tl=tl))
 }
 
+binsreg.basis.quad <- function(basis, vcv, p, s, bin.pos) {
+  if (is.null(bin.pos) || p < 0L || nrow(basis)==0L || ncol(basis) != ncol(vcv)) return(NULL)
+  p <- as.integer(p)
+  s <- as.integer(s)
+  n <- nrow(basis)
+  width <- p - s + 1L
+  if (width < 1L) return(NULL)
+  base <- (as.integer(bin.pos) - 1L)*width + 1L
+  if (length(base) != n || anyNA(base) || any(base < 1L) || any(base + p > ncol(basis))) return(NULL)
+
+  idx <- seq_len(n)
+  q <- numeric(n)
+  for (a in 0:p) {
+    va <- basis[idx + (base + a - 1L)*n]
+    ca <- base + a
+    q <- q + va^2 * vcv[ca + (ca - 1L)*ncol(vcv)]
+    if (a < p) {
+      for (b in (a+1L):p) {
+        cb <- base + b
+        vb <- basis[idx + (base + b - 1L)*n]
+        q <- q + 2 * va * vb * vcv[ca + (cb - 1L)*ncol(vcv)]
+      }
+    }
+  }
+  return(q)
+}
+
 # IMSE V cons
 genV <- function(y, x, w, p, s, deriv, knot, vce, cluster=NULL, weights=NULL,
-                 B0=NULL, basis.deriv=NULL) {
-  if (is.null(B0)) B0 <- binsreg.spdes(eval=x, p=p, s=s, knot=knot, deriv=0)
+                 B0=NULL, basis.deriv=NULL, bin.pos=NULL) {
+  if (is.null(B0)) B0 <- binsreg.spdes(eval=x, p=p, s=s, knot=knot, deriv=0, pos=bin.pos)
   B <- B0
   k  <- ncol(B)
   if (!is.null(basis.deriv)) {
      basis <- basis.deriv
   } else if (deriv>0) {
-     basis <- binsreg.spdes(eval=x, p=p, s=s, knot=knot, deriv=deriv)
+     basis <- binsreg.spdes(eval=x, p=p, s=s, knot=knot, deriv=deriv, pos=bin.pos)
   } else {
      basis <- B
   }
-  P     <- binsreg.cbind(B, w)
-  model  <- binsreg.fit.lm(y, P, weights=weights)
+  model  <- binsreg.fit.lm.design(y, B, w, weights=weights, vcov.type=vce, cluster=cluster)
   pos <- !is.na(model$coeff[1:k])
   k.new <- sum(pos)
-  vcv <- binsreg.vcov(model, type=vce, cluster=cluster)[1:k.new, 1:k.new]
-  m.s2   <- binsreg.summ(rowSums((basis[,pos, drop=F] %*% vcv) * basis[,pos, drop=F]), w=weights, std=F)$mu
+  vcv.full <- binsreg.vcov(model, type=vce, cluster=cluster)
+  if (all(pos)) {
+    quad <- binsreg.basis.quad(basis, vcv.full[seq_len(k), seq_len(k), drop=FALSE], p, s, bin.pos)
+  } else {
+    quad <- NULL
+  }
+  if (is.null(quad)) {
+    vcv <- vcv.full[1:k.new, 1:k.new]
+    quad <- rowSums((basis[,pos, drop=F] %*% vcv) * basis[,pos, drop=F])
+  }
+  m.s2 <- if (is.null(weights)) mean(quad) else weighted.mean(quad, w=weights)
   return(m.s2)
 }
 
 # bias term
-bias <- function(x, p, s, deriv, knot) {
-  locate <- binsreg.locate(x, knot)
+bias <- function(x, p, s, deriv, knot, pos=NULL) {
+  locate <- binsreg.locate(x, knot, pos=pos)
   h  <- locate$h
   tl <- locate$tl
   bern <- bernpoly((x-tl)/h, p+1-deriv) / factorial(p+1-deriv) * (h^(p+1-deriv))
@@ -574,64 +1213,126 @@ bias <- function(x, p, s, deriv, knot) {
 }
 
 genB <- function(y, x, w, p, s, deriv, knot, weights=NULL,
-                 B0=NULL, basis.deriv=NULL) {
-  B  <- binsreg.spdes(eval=x, p=p+1, s=s+1, knot=knot, deriv=0)   # use smoothest spline
-  k    <- ncol(B)
-  P    <- binsreg.cbind(B, w)
-  beta <- binsreg.fit.lm(y, P, weights=weights)$coefficients[1:k]
-  pos  <- !is.na(beta)
-  basis <- binsreg.spdes(eval=x, p=p+1, s=s+1, knot=knot, deriv=p+1)
-  basis.pos <- basis[, pos, drop=F]
-  mu.m.fit  <- basis.pos %*% beta[pos]
-
-  bias.0 <- mu.m.fit * bias(x, p, s, 0, knot)    # proj component, v=0!!!
-  if (is.null(B0)) B0 <- binsreg.spdes(eval=x, p=p, s=s, knot=knot, deriv=0)
-  B <- B0
-  beta <- binsreg.fit.lm(bias.0, B, weights=weights)$coefficients
-  pos <- !is.na(beta)
-  if (deriv > 0) {
-     if (is.null(basis.deriv)) {
-       basis <- binsreg.spdes(eval=x, p=p, s=s, knot=knot, deriv=deriv)
-     } else {
-       basis <- basis.deriv
-     }
-     bias.v <- mu.m.fit * bias(x, p, s, deriv, knot)    # need to recalculate for v>0!!!
+                 B0=NULL, basis.deriv=NULL, bin.pos=NULL,
+                 basis.smooth=NULL, basis.smooth.deriv=NULL) {
+  if (is.null(basis.smooth)) {
+    B <- binsreg.spdes(eval=x, p=p+1, s=s+1, knot=knot, deriv=0, pos=bin.pos)   # use smoothest spline
   } else {
-     basis <- B
-     bias.v <- bias.0
+    B <- basis.smooth
   }
-  basis.pos <- basis[, pos, drop=F]
-  bias.l2 <- bias.v - basis.pos %*% beta[pos]
-  bias.cons <- binsreg.summ(bias.l2^2, w=weights, std=F)$mu
+  k    <- ncol(B)
+  beta <- binsreg.fit.lm.slim(y, B, w, weights=weights)$coefficients[1:k]
+  pos  <- !is.na(beta)
+  if (is.null(basis.smooth.deriv) && p == 2L && s == 2L && !is.null(bin.pos) && all(pos)) {
+    mu.m.fit <- binsreg.spdes.p3d3.fit(x, knot, bin.pos, beta)
+  } else {
+    if (is.null(basis.smooth.deriv)) {
+    basis <- binsreg.spdes(eval=x, p=p+1, s=s+1, knot=knot, deriv=p+1, pos=bin.pos)
+    } else {
+      basis <- basis.smooth.deriv
+    }
+    basis.pos <- basis[, pos, drop=F]
+    mu.m.fit  <- basis.pos %*% beta[pos]
+  }
+
+  bias.0 <- mu.m.fit * bias(x, p, s, 0, knot, pos=bin.pos)    # proj component, v=0!!!
+  if (is.null(B0)) B0 <- binsreg.spdes(eval=x, p=p, s=s, knot=knot, deriv=0, pos=bin.pos)
+  B <- B0
+  if (p == 0 && s == 0 && deriv == 0 && is.null(weights)) {
+    xcat <- if (is.null(bin.pos)) findInterval(x, knot, rightmost.closed=TRUE, left.open=TRUE) else bin.pos
+    projbias <- rep(NA_real_, length(x))
+    for (j in seq_len(length(knot) - 1L)) {
+      selected <- xcat == j
+      if (any(selected)) projbias[selected] <- mean(bias.0[selected])
+    }
+    bias.l2 <- bias.0 - projbias
+  } else {
+    beta <- binsreg.fit.lm.slim(bias.0, B, weights=weights)$coefficients
+    pos <- !is.na(beta)
+    if (deriv > 0) {
+       if (is.null(basis.deriv)) {
+         basis <- binsreg.spdes(eval=x, p=p, s=s, knot=knot, deriv=deriv, pos=bin.pos)
+       } else {
+         basis <- basis.deriv
+       }
+       bias.v <- mu.m.fit * bias(x, p, s, deriv, knot, pos=bin.pos)    # need to recalculate for v>0!!!
+    } else {
+       basis <- B
+       bias.v <- bias.0
+    }
+    basis.pos <- basis[, pos, drop=F]
+    bias.l2 <- bias.v - basis.pos %*% beta[pos]
+  }
+  bias.cons <- if (is.null(weights)) mean(bias.l2^2) else weighted.mean(bias.l2^2, w=weights)
   return(bias.cons)
 }
 
 # DPI selector
-binsregselect.dpi <- function(y, x, w, p, s, deriv, es=F, vce, cluster=NULL, nbinsrot, weights=NULL) {
+binsregselect.dpi <- function(y, x, w, p, s, deriv, es=F, vce, cluster=NULL, nbinsrot, weights=NULL,
+                              x.norm=NULL, selector.cache=NULL) {
   J.rot <- nbinsrot
-  x <- (x - min(x))/ (max(x) - min(x))
+  if (is.null(x.norm)) {
+    x <- (x - min(x))/ (max(x) - min(x))
+  } else {
+    x <- x.norm
+  }
   ord <- p + 1
 
-  if (es) {
-    knot <- genKnot.es(0, 1, J.rot)
+  cache.key <- paste(as.integer(es), format(J.rot, digits=17), sep=":")
+  if (!is.null(selector.cache)) {
+    knot.key <- paste("knot", cache.key, sep=":")
+    bin.key <- paste("bin", cache.key, sep=":")
+    if (exists(knot.key, envir=selector.cache, inherits=FALSE)) {
+      knot <- get(knot.key, envir=selector.cache, inherits=FALSE)
+    } else {
+      if (es) {
+        knot <- genKnot.es(0, 1, J.rot)
+      } else {
+        knot <- genKnot.qs(x, J.rot)
+      }
+      assign(knot.key, knot, envir=selector.cache)
+    }
+    if (exists(bin.key, envir=selector.cache, inherits=FALSE)) {
+      bin.pos <- get(bin.key, envir=selector.cache, inherits=FALSE)
+    } else {
+      bin.pos <- binsreg.stata.irecode(x, knot)
+      assign(bin.key, bin.pos, envir=selector.cache)
+    }
   } else {
-    knot <- genKnot.qs(x, J.rot)
+    if (es) {
+      knot <- genKnot.es(0, 1, J.rot)
+    } else {
+      knot <- genKnot.qs(x, J.rot)
+    }
+    bin.pos <- binsreg.stata.irecode(x, knot)
   }
 
-  B0 <- binsreg.spdes(eval=x, p=p, s=s, knot=knot, deriv=0)
-  basis.deriv <- if (deriv>0) {
-    binsreg.spdes(eval=x, p=p, s=s, knot=knot, deriv=deriv)
-  } else {
-    B0
+  get.basis <- function(pp, ss, dd) {
+    if (is.null(selector.cache)) {
+      return(binsreg.spdes(eval=x, p=pp, s=ss, knot=knot, deriv=dd, pos=bin.pos))
+    }
+    basis.key <- paste("basis", cache.key, pp, ss, dd, sep=":")
+    if (!exists(basis.key, envir=selector.cache, inherits=FALSE)) {
+      assign(basis.key, binsreg.spdes(eval=x, p=pp, s=ss, knot=knot, deriv=dd, pos=bin.pos),
+             envir=selector.cache)
+    }
+    get(basis.key, envir=selector.cache, inherits=FALSE)
   }
+  B0 <- get.basis(p, s, 0)
+  basis.deriv <- if (deriv>0) get.basis(p, s, deriv) else B0
+  basis.smooth <- get.basis(p+1, s+1, 0)
+  basis.smooth.deriv <- if (p == 2L && s == 2L && !is.null(bin.pos)) NULL else get.basis(p+1, s+1, p+1)
 
   # bias constant
   imse.b <- genB(y, x, w, p, s, deriv, knot, weights=weights,
-                 B0=B0, basis.deriv=basis.deriv) * J.rot^(2*(ord-deriv))
+                 B0=B0, basis.deriv=basis.deriv,
+                 bin.pos=bin.pos, basis.smooth=basis.smooth,
+                 basis.smooth.deriv=basis.smooth.deriv) * J.rot^(2*(ord-deriv))
 
   # variance constant
   genV_val <- genV(y, x, w, p, s, deriv, knot, vce, cluster,
-                   weights=weights, B0=B0, basis.deriv=basis.deriv)
+                   weights=weights, B0=B0, basis.deriv=basis.deriv,
+                   bin.pos=bin.pos)
   imse.v <- genV_val / (J.rot^(1+2*deriv))
   J.dpi <- ceiling((imse.b*2*(ord-deriv)/((1+2*deriv)*imse.v))^(1/(2*ord+1)))
   return(list(J.dpi=J.dpi, imse.v=imse.v, imse.b=imse.b))
