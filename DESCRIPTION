@@ -1,8 +1,8 @@
 Package: binsreg
 Type: Package
 Title: Binscatter Estimation and Inference
-Date: 2026-05-22
-Version: 2.1
+Date: 2026-08-20
+Version: 2.2
 Authors@R: c(
     person("Matias D.", "Cattaneo", email = "matias.d.cattaneo@gmail.com", role = c("aut", "cre")),
     person("Richard K.", "Crump", email = "richard.crump@gmail.com", role = "aut"),
@@ -25,6 +25,6 @@ Suggests: testthat (>= 3.0.0)
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0
 NeedsCompilation: no
-Packaged: 2026-05-22 06:43:03 UTC; CodexSandboxOffline
+Packaged: 2026-08-20 11:43:49 UTC; cattaneo
 Repository: CRAN
-Date/Publication: 2026-05-22 07:30:02 UTC
+Date/Publication: 2026-08-21 05:45:05 UTC

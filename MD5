@@ -1,4 +1,4 @@
-a74a951d025e8edcde75b73325a01988 *DESCRIPTION
+7871ca3bc809bf0312f57aff1d816bb9 *DESCRIPTION
 85250c602859b4b6ead5e2c384826e77 *NAMESPACE
 8b210baffbdfb2019d8e7ea3b58a1ebd *R/binsglm.R
 63fedb3689e1b2293affd9592603245c *R/binspwc.R
@@ -7,7 +7,7 @@ a74a951d025e8edcde75b73325a01988 *DESCRIPTION
 45e24a402fb2c5c7d119626ba99436cd *R/binsreg.R
 16762e2f3d0ace0f7826081f423e0434 *R/binsreg_functions.R
 982cf6396707d6c64fa3b5510788184c *R/binsregselect.R
-8734df082a9d95d3c234568bc6f1786d *R/binstest.R
+9ef46d02e6c8e943a8189c0513a32a65 *R/binstest.R
 575471e336a13983e4ff2f834d5176e8 *man/binsglm.Rd
 5709ae5bf4ff15591e325b7d9b3a78ab *man/binspwc.Rd
 388a62d4099b9b7bbf80e88e81f72662 *man/binsqreg.Rd
@@ -28,3 +28,5 @@ b0d2729450ffe4771e26beeabbd31b16 *man/print.CCFFbinsregselect.Rd
 39fa812397bf22a845ec2baabccfcee3 *man/summary.CCFFbinsregselect.Rd
 25deda95566f57d2a129d94e047b6e9c *man/summary.CCFFbinstest.Rd
 0c49567286c02ca9c379b315a2929e5c *tests/fixtures/replication-r-smoke.csv
+a31f0d0c104ea6722ca9ad06a04b943b *tests/testthat.R
+a090d95843b54fe28158ecd2ac65ebef *tests/testthat/test-binstest-glm-polynomial.R
